@@ -651,7 +651,7 @@ class TestQuestionRepository(ITestQuestionRepository):
                     scores["kip"] += 1
                 elif "автоматизированн" in selected:
                     scores["kip"] += 2
-                    scores["robot"] += 2
+                    scores["robot"] += 3  # Больше баллов для робототехники
                 elif "творческ" in selected:
                     scores["cook"] += 2
                 elif "интеллектуальн" in selected:
@@ -659,6 +659,8 @@ class TestQuestionRepository(ITestQuestionRepository):
                     scores["kip"] += 1
                     scores["robot"] += 1
                     scores["operator"] += 1
+                elif "компьютер" in selected:
+                    scores["robot"] += 2  # Компьютеры -> робототехника
             
             # Вопрос 3: Работа на открытом воздухе?
             if question_id == 3:
@@ -726,12 +728,17 @@ class TestQuestionRepository(ITestQuestionRepository):
                 if "лампа" in selected:
                     scores["kip"] += 3
                     scores["robot"] += 2
+                elif "светодиодн" in selected:
+                    scores["robot"] += 3  # LED -> робототехника
             
             # Вопрос 11: Прибор учета электроэнергии
             if question_id == 11:
                 if "прибор учет" in selected or "электроэнерг" in selected:
                     scores["kip"] += 3
                     scores["robot"] += 2
+                elif "газоанализатор" in selected:
+                    scores["chemist"] += 2
+                    scores["operator"] += 2
             
             # Вопрос 12: Миксер кондитерский
             if question_id == 12:
