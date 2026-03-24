@@ -333,7 +333,7 @@ class TestResultResponse(BaseModel):
     """Результат теста."""
     recommendation: str
     motivation: str
-    recommended_specialties: list[str]
+    recommended_specialties: list[dict]
 
 
 # === Error ===

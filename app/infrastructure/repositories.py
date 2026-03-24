@@ -612,36 +612,276 @@ class TestQuestionRepository(ITestQuestionRepository):
     
     async def calculate_recommendation(self, answers: list[dict]) -> dict:
         """
-        Упрощённая логика расчёта рекомендации.
-        В реальности здесь будет более сложная система подсчёта баллов.
+        Расчёт рекомендации на основе ответов.
+        Каждая специальность получает баллы за соответствующие ответы.
         """
-        # Подсчитываем "технические" ответы
-        technic_keywords = ["техник", "сбор", "физический труд", "производство", "техника"]
-        technic_count = 0
+        # Счётчики для различных направлений
+        scores = {
+            "welder": 0,  # Сварщики
+            "builder": 0,  # Сооруженцы
+            "cook": 0,  # Повара
+            "chemist": 0,  # Химики
+            "kip": 0,  # КИП, электрики
+            "robot": 0,  # Роботизированные системы
+            "operator": 0,  # Операторы химических производств
+        }
         
+        # Анализ ответов
         for answer in answers:
             selected = answer.get("selected", "").lower()
-            if any(kw in selected for kw in technic_keywords):
-                technic_count += 1
+            question_id = answer.get("question_id", 0)
+            
+            # Вопрос 1: Любишь ли ты работать физически?
+            if question_id == 1:
+                if "да" in selected:
+                    scores["welder"] += 2
+                    scores["builder"] += 2
+                    scores["cook"] += 1
+                else:
+                    scores["chemist"] += 1
+                    scores["kip"] += 1
+                    scores["robot"] += 1
+            
+            # Вопрос 2: Какая работа нравится?
+            if question_id == 2:
+                if "ручн" in selected or "физическ" in selected:
+                    scores["welder"] += 2
+                    scores["builder"] += 2
+                    scores["cook"] += 2
+                    scores["kip"] += 1
+                elif "автоматизированн" in selected:
+                    scores["kip"] += 2
+                    scores["robot"] += 2
+                elif "творческ" in selected:
+                    scores["cook"] += 2
+                elif "интеллектуальн" in selected:
+                    scores["chemist"] += 1
+                    scores["kip"] += 1
+                    scores["robot"] += 1
+                    scores["operator"] += 1
+            
+            # Вопрос 3: Работа на открытом воздухе?
+            if question_id == 3:
+                if "да" in selected:
+                    scores["welder"] += 2
+                    scores["builder"] += 3
+                else:
+                    scores["chemist"] += 1
+                    scores["cook"] += 1
+                    scores["kip"] += 1
+            
+            # Вопрос 4: Предметы в школе
+            if question_id == 4:
+                if "биолог" in selected or "хим" in selected:
+                    scores["chemist"] += 2
+                    scores["cook"] += 1
+                    scores["welder"] += 1
+                if "математик" in selected or "физик" in selected:
+                    scores["kip"] += 2
+                    scores["robot"] += 2
+                    scores["welder"] += 1
+                    scores["builder"] += 1
+                if "геометр" in selected:
+                    scores["welder"] += 2
+                    scores["builder"] += 2
+                if "физкультур" in selected:
+                    scores["welder"] += 1
+                    scores["builder"] += 1
+            
+            # Вопрос 5: Маска
+            if question_id == 5:
+                if "сварочн" in selected:
+                    scores["welder"] += 3
+            
+            # Вопрос 6: Прибор (Амперметр)
+            if question_id == 6:
+                if "амперметр" in selected or "дозиметр" in selected:
+                    scores["kip"] += 3
+                    scores["robot"] += 2
+            
+            # Вопрос 7: Спиртовка
+            if question_id == 7:
+                if "спиртовк" in selected or "горелк" in selected:
+                    scores["chemist"] += 3
+            
+            # Вопрос 8: Инструмент
+            if question_id == 8:
+                if "сварочн" in selected or "шлифовальн" in selected:
+                    scores["welder"] += 3
+                elif "колб" in selected or "пробирк" in selected:
+                    scores["chemist"] += 3
+                elif "вес" in selected or "миксер" in selected:
+                    scores["cook"] += 3
+                elif "отвертк" in selected or "ключ" in selected:
+                    scores["kip"] += 2
+                    scores["robot"] += 2
+            
+            # Вопрос 9: Торт
+            if question_id == 9:
+                if "наполеон" in selected or "красный бархат" in selected:
+                    scores["cook"] += 3
+            
+            # Вопрос 10: Лампа
+            if question_id == 10:
+                if "лампа" in selected:
+                    scores["kip"] += 3
+                    scores["robot"] += 2
+            
+            # Вопрос 11: Прибор учета электроэнергии
+            if question_id == 11:
+                if "прибор учет" in selected or "электроэнерг" in selected:
+                    scores["kip"] += 3
+                    scores["robot"] += 2
+            
+            # Вопрос 12: Миксер кондитерский
+            if question_id == 12:
+                if "миксер" in selected:
+                    scores["cook"] += 3
+            
+            # Вопрос 13: Перчатки
+            if question_id == 13:
+                if "сварщик" in selected:
+                    scores["welder"] += 3
+            
+            # Вопрос 14: Химическое производство
+            if question_id == 14:
+                if "химическ" in selected:
+                    scores["chemist"] += 2
+                    scores["operator"] += 3
+            
+            # Вопрос 15: Трубопровод
+            if question_id == 15:
+                if "трубопровод" in selected:
+                    scores["builder"] += 3
         
-        # Определяем рекомендацию
-        if technic_count >= 5:
-            recommendation = "Вам отлично подойдёт специальность «Сварочное производство»!"
-            motivation = "Вы любите работать руками, интересуетесь техникой и готовы к работе на производстве. Это идеальное сочетание для успешной карьеры сварщика."
-            specialties = ["15.02.19", "22.02.06"]
-        elif technic_count >= 3:
-            recommendation = "Вам могут подойти технические или IT-специальности!"
-            motivation = "У вас есть интерес к технике, но также вы открыты к другим направлениям. Рассмотрите сварочное производство или информационные системы."
-            specialties = ["15.02.19", "09.02.07"]
+        # Определяем топ-3 специальности
+        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # Формируем рекомендации на основе лучших результатов
+        top_specialties = []
+        recommendation_text = ""
+        motivation_text = ""
+        
+        # Логика рекомендаций
+        if sorted_scores[0][0] == "welder" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "15.02.19",
+                    "name": "Сварочное производство",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                },
+                {
+                    "code": "15.01.05",
+                    "name": "Сварщик (ручной и частично механизированной сварки)",
+                    "duration": "1 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам отлично подойдёт направление «Сварочное производство»!"
+            motivation_text = "Вы любите работать руками, интересуетесь техникой и готовы к физической работе. Сварщики — востребованная профессия с высокой зарплатой."
+        
+        elif sorted_scores[0][0] == "builder" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "21.02.03",
+                    "name": "Сооружение и эксплуатация газонефтепроводов и газонефтехранилищ",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Сооружение и эксплуатация газонефтепроводов»!"
+            motivation_text = "Вы готовы работать на открытом воздухе и заниматься строительством. Это стабильная профессия в нефтегазовой отрасли."
+        
+        elif sorted_scores[0][0] == "cook" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "19.02.10",
+                    "name": "Технология продукции общественного питания",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Поварское дело»!"
+            motivation_text = "У вас есть творческие способности и интерес к приготовлению пищи. Повара — всегда востребованная профессия."
+        
+        elif sorted_scores[0][0] == "chemist" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "18.02.12",
+                    "name": "Технология аналитического контроля химических соединений",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Химическая технология»!"
+            motivation_text = "У вас есть интерес к химии и точным наукам. Химики-аналитики работают в лабораториях и на производствах."
+        
+        elif sorted_scores[0][0] == "kip" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "15.01.37",
+                    "name": "Слесарь-наладчик КИПиА",
+                    "duration": "1 г. 10 мес.",
+                    "budget_places": 25
+                },
+                {
+                    "code": "13.01.10",
+                    "name": "Электромонтер по ремонту и обслуживанию электрооборудования",
+                    "duration": "1 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Контрольно-измерительные приборы и автоматика»!"
+            motivation_text = "У вас технический склад ума и интерес к электронике. Специалисты КИПиА и электрики — востребованы на любом производстве."
+        
+        elif sorted_scores[0][0] == "robot" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "15.02.18",
+                    "name": "Техническая эксплуатация роботизированного производства",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 50
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Роботизированное производство»!"
+            motivation_text = "Вас интересуют автоматизация и роботы. Это современная и перспективная область промышленности."
+        
+        elif sorted_scores[0][0] == "operator" and sorted_scores[0][1] > 0:
+            top_specialties = [
+                {
+                    "code": "18.01.35",
+                    "name": "Аппаратчик-оператор производства химических соединений",
+                    "duration": "1 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам подойдёт направление «Оператор химического производства»!"
+            motivation_text = "Вы готовы работать на химическом производстве. Это стабильная работа с хорошими перспективами."
+        
         else:
-            recommendation = "Вам могут подойти специальности в сфере сервиса или экономики!"
-            motivation = "Вы предпочитаете работу с людьми или документами. Рассмотрите поварское дело или экономику и бухгалтерский учёт."
-            specialties = ["43.02.15", "38.02.01"]
+            # Если ни одна специальность не набрала баллов
+            top_specialties = [
+                {
+                    "code": "15.02.19",
+                    "name": "Сварочное производство",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                },
+                {
+                    "code": "21.02.03",
+                    "name": "Сооружение и эксплуатация газонефтепроводов",
+                    "duration": "3 г. 10 мес.",
+                    "budget_places": 25
+                }
+            ]
+            recommendation_text = "Вам могут подойти технические специальности нашего колледжа!"
+            motivation_text = "Рекомендуем пройти тест ещё раз или обратиться к приёмной комиссии для индивидуальной консультации."
         
         return {
-            "recommendation": recommendation,
-            "motivation": motivation,
-            "recommended_specialties": specialties,
+            "recommendation": recommendation_text,
+            "motivation": motivation_text,
+            "recommended_specialties": top_specialties,
         }
     
     def _to_domain(self, model: TestQuestionModel) -> TestQuestion:
