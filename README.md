@@ -130,6 +130,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **Swagger UI:** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
 
+📄 **Полная техническая документация:** см. [DOCUMENTATION.md](DOCUMENTATION.md)
+
 ## 🔌 Эндпоинты API v1
 
 Базовый URL: `/api/v1`
@@ -262,6 +264,10 @@ pytest
 ```bash
 pytest --cov=app --cov-report=html
 ```
+
+**Покрытие тестами:** 64% (54 unit-теста)
+
+См. [tests/README.md](tests/README.md) для подробной информации.
 
 ## 📦 Docker контейнеры
 

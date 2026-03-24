@@ -7,8 +7,15 @@ tests/
 ├── __init__.py          # Пакет тестов
 ├── conftest.py          # Фикстуры и конфигурация pytest
 ├── test_api.py          # Unit-тесты API (с изолированной БД)
+├── test_auth.py         # Unit-тесты аутентификации и админ-панели
 └── test_integration.py  # Интеграционные тесты (с реальным API)
 ```
+
+## Статус тестов
+
+- **Unit-тесты:** 54 теста ✅
+- **Интеграционные тесты:** 19 тестов (требуют запущенный API)
+- **Покрытие:** 64%
 
 ## Типы тестов
 
@@ -68,7 +75,7 @@ xdg-open htmlcov/index.html  # Linux
 
 ## Покрытие тестами
 
-### Endpoints:
+### Endpoints (публичные):
 - ✅ `GET /health` - Health check
 - ✅ `GET /` - Root endpoint
 - ✅ `GET /api/v1/about` - Информация о колледже
@@ -85,12 +92,58 @@ xdg-open htmlcov/index.html  # Linux
 - ✅ `GET /api/v1/test/questions` - Вопросы теста
 - ✅ `POST /api/v1/test/results` - Результаты теста
 
+### Endpoints (аутентификация и админка):
+- ✅ `POST /auth/register` - Регистрация
+- ✅ `POST /auth/login` - Вход
+- ✅ `POST /auth/refresh` - Обновление токена
+- ✅ `POST /auth/logout` - Выход
+- ✅ `GET /auth/me` - Текущий пользователь
+- ✅ `GET /admin/users` - Список пользователей
+- ✅ `GET /admin/users/{id}` - Пользователь по ID
+- ✅ `PATCH /admin/users/{id}` - Обновление пользователя
+- ✅ `DELETE /admin/users/{id}` - Удаление пользователя
+- ✅ `GET /admin/specialties` - Список специальностей
+- ✅ `POST /admin/specialties` - Создание специальности
+- ✅ `GET /admin/specialties/{id}` - Специальность по ID
+- ✅ `PUT /admin/specialties/{id}` - Обновление специальности
+- ✅ `DELETE /admin/specialties/{id}` - Удаление специальности
+- ✅ `GET /admin/news` - Список новостей
+- ✅ `POST /admin/news` - Создание новости
+- ✅ `GET /admin/news/{id}` - Новость по ID
+- ✅ `PUT /admin/news/{id}` - Обновление новости
+- ✅ `DELETE /admin/news/{id}` - Удаление новости
+- ✅ `GET /admin/facts` - Список фактов
+- ✅ `POST /admin/facts` - Создание факта
+- ✅ `GET /admin/facts/{id}` - Факт по ID
+- ✅ `PUT /admin/facts/{id}` - Обновление факта
+- ✅ `DELETE /admin/facts/{id}` - Удаление факта
+- ✅ `GET /admin/faq` - Список FAQ
+- ✅ `POST /admin/faq` - Создание FAQ
+- ✅ `GET /admin/faq/{id}` - FAQ по ID
+- ✅ `PUT /admin/faq/{id}` - Обновление FAQ
+- ✅ `DELETE /admin/faq/{id}` - Удаление FAQ
+- ✅ `GET /admin/documents` - Список документов
+- ✅ `POST /admin/documents` - Создание документа
+- ✅ `DELETE /admin/documents/{id}` - Удаление документа
+- ✅ `GET /admin/images` - Список изображений
+- ✅ `POST /admin/images` - Создание элемента галереи
+- ✅ `DELETE /admin/images/{id}` - Удаление изображения
+- ✅ `GET /admin/test/questions` - Список вопросов теста
+- ✅ `POST /admin/test/questions` - Создание вопроса
+- ✅ `DELETE /admin/test/questions/{id}` - Удаление вопроса
+- ✅ `GET /admin/about` - Информация о колледже
+- ✅ `PUT /admin/about` - Обновление информации
+- ✅ `POST /admin/upload/image` - Загрузка изображения
+- ✅ `POST /admin/upload/document` - Загрузка документа
+
 ### Функциональность:
 - ✅ Пагинация
 - ✅ Поиск и фильтрация
 - ✅ Обработка ошибок (400, 404, 422)
 - ✅ Валидация данных
 - ✅ Подсчёт просмотров новостей
+- ✅ JWT аутентификация
+- ✅ Проверка прав суперпользователя
 
 ## Конфигурация
 
