@@ -227,13 +227,13 @@ class GetNewsBySlugUseCase:
 
 class GetFAQUseCase:
     """Получение списка FAQ."""
-    
+
     def __init__(self, repository: IFAQRepository):
         self.repository = repository
-    
+
     async def execute(self, category: Optional[str] = None) -> list[dict]:
         faq_list = await self.repository.get_all(category=category)
-        
+
         return [
             {
                 "id": f.id,
@@ -242,6 +242,7 @@ class GetFAQUseCase:
                 "category": f.category,
                 "show_in_admission": f.show_in_admission,
                 "images": [{"url": img.url, "alt": img.alt, "caption": img.caption} for img in f.images],
+                "documents": [{"url": doc.url, "alt": doc.alt, "caption": doc.caption} for doc in f.documents],
             }
             for f in faq_list
         ]
@@ -294,19 +295,20 @@ class GetGalleryUseCase:
 
 class GetTestQuestionsUseCase:
     """Получение вопросов профориентационного теста."""
-    
+
     def __init__(self, repository: ITestQuestionRepository):
         self.repository = repository
-    
+
     async def execute(self) -> list[dict]:
         questions = await self.repository.get_all()
-        
+
         return [
             {
                 "id": q.id,
                 "text": q.text,
                 "options": q.options,
                 "image_url": q.image_url,
+                "documents": [{"url": doc.url, "alt": doc.alt, "caption": doc.caption} for doc in q.documents],
             }
             for q in questions
         ]

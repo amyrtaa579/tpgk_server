@@ -69,12 +69,13 @@ class News(BaseEntity):
 @dataclass
 class FAQ(BaseEntity):
     """Часто задаваемый вопрос."""
-    
+
     question: str = ""
     answer: str | list[str] = ""
     category: str = ""
     show_in_admission: bool = False
     images: list[Image] = field(default_factory=list)
+    documents: list[Image] = field(default_factory=list)
 
 
 @dataclass
@@ -103,10 +104,11 @@ class GalleryImage(BaseEntity):
 @dataclass
 class TestQuestion(BaseEntity):
     """Вопрос профориентационного теста."""
-    
+
     text: str = ""
     options: list[str] = field(default_factory=list)
     image_url: Optional[str] = None
+    documents: list[Image] = field(default_factory=list)
 
 
 @dataclass

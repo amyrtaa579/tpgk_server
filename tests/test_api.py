@@ -603,7 +603,8 @@ class TestFAQ:
                 answer="Ответ 1",
                 category="Общее",
                 show_in_admission=True,
-                images=[]
+                images=[],
+                documents=[]
             )
         )
         await test_session.execute(
@@ -612,13 +613,14 @@ class TestFAQ:
                 answer="Ответ 2",
                 category="Приём",
                 show_in_admission=False,
-                images=[]
+                images=[],
+                documents=[]
             )
         )
         await test_session.commit()
-        
+
         response = await client.get("/api/v1/faq")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
@@ -631,7 +633,8 @@ class TestFAQ:
                 answer="Ответ 1",
                 category="Общее",
                 show_in_admission=True,
-                images=[]
+                images=[],
+                documents=[]
             )
         )
         await test_session.execute(
@@ -640,13 +643,14 @@ class TestFAQ:
                 answer="Ответ 2",
                 category="Приём",
                 show_in_admission=False,
-                images=[]
+                images=[],
+                documents=[]
             )
         )
         await test_session.commit()
-        
+
         response = await client.get("/api/v1/faq?category=Приём")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
@@ -819,13 +823,14 @@ class TestProfiling:
                 insert(TestQuestionModel).values(
                     text=f"Вопрос {i}",
                     options=["Вариант 1", "Вариант 2", "Вариант 3"],
-                    image_url=None
+                    image_url=None,
+                    documents=[]
                 )
             )
         await test_session.commit()
-        
+
         response = await client.get("/api/v1/test/questions")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 10
