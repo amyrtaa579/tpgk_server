@@ -308,6 +308,7 @@ def create_admin_specialties_router() -> APIRouter:
                 "name": s.name,
                 "short_description": s.short_description,
                 "description": s.description,
+                "exams": s.exams,
                 "images": s.images,
                 "documents": s.documents,
                 "education_options": [
