@@ -51,6 +51,7 @@ class SpecialtyAdmissionSchema(BaseModel):
     """Схема специальности для приёма."""
     code: str
     name: str
+    education_level: Optional[str] = None
     budget_places: int
     paid_places: int
     exams: list[str]
