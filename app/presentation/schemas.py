@@ -160,6 +160,7 @@ class SpecialtyListItemSchema(BaseModel):
     name: str
     short_description: str
     description: list[str] = []
+    exams: list[str] = []
     images: list[ImageSchema]
     documents: list[ImageSchema] = []
     education_options: list[SpecialtyEducationOptionSchema] = []

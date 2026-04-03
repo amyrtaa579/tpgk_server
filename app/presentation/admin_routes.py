@@ -1549,13 +1549,13 @@ def create_admin_admission_router() -> APIRouter:
         if "specialties_admission" in update_data and update_data["specialties_admission"] is not None:
             admission.specialties_admission = [
                 {
-                    "code": s["code"],
-                    "name": s["name"],
+                    "code": s.get("code"),
+                    "name": s.get("name"),
                     "education_level": s.get("education_level"),
-                    "budget_places": s["budget_places"],
-                    "paid_places": s["paid_places"],
-                    "exams": s["exams"],
-                    "duration": s["duration"],
+                    "budget_places": s.get("budget_places"),
+                    "paid_places": s.get("paid_places"),
+                    "exams": s.get("exams"),
+                    "duration": s.get("duration"),
                 }
                 for s in update_data["specialties_admission"]
             ]
@@ -1563,9 +1563,9 @@ def create_admin_admission_router() -> APIRouter:
         if "submission_methods" in update_data and update_data["submission_methods"] is not None:
             admission.submission_methods = [
                 {
-                    "title": m["title"],
-                    "description": m["description"],
-                    "link": m["link"],
+                    "title": m.get("title"),
+                    "description": m.get("description"),
+                    "link": m.get("link"),
                 }
                 for m in update_data["submission_methods"]
             ]
@@ -1573,9 +1573,9 @@ def create_admin_admission_router() -> APIRouter:
         if "important_dates" in update_data and update_data["important_dates"] is not None:
             admission.important_dates = [
                 {
-                    "title": d["title"],
-                    "date": d["date"] if isinstance(d["date"], str) else d["date"].isoformat(),
-                    "description": d["description"],
+                    "title": d.get("title"),
+                    "date": d.get("date") if isinstance(d.get("date"), str) else d.get("date").isoformat() if d.get("date") else None,
+                    "description": d.get("description"),
                 }
                 for d in update_data["important_dates"]
             ]

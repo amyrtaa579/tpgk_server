@@ -28,6 +28,9 @@ from app.domain.repositories import (
     ITestQuestionRepository,
 )
 from app.core.exceptions import NotFoundException, BadRequestException, ValidationException
+from app.core.config import get_settings
+
+settings = get_settings()
 
 
 class GetAboutInfoUseCase:
@@ -68,25 +71,39 @@ class GetSpecialtiesUseCase:
     ) -> dict:
         if page < 1:
             raise BadRequestException("Номер страницы должен быть >= 1")
-        if limit < 1 or limit > 50:
-            raise BadRequestException("Лимит должен быть от 1 до 50")
+        if limit < settings.pagination_min_limit or limit > settings.pagination_max_limit:
+            raise BadRequestException(f"Лимит должен быть от {settings.pagination_min_limit} до {settings.pagination_max_limit}")
         if form and form not in ("budget", "paid"):
             raise BadRequestException("Некорректное значение form. Допустимы: budget, paid")
         
         specialties, total = await self.repository.get_all(
             page=page, limit=limit, search=search, form=form, popular=popular
         )
-        
+
         items = [
             {
+                "id": s.id,
                 "code": s.code,
                 "name": s.name,
                 "short_description": s.short_description,
+                "description": s.description,
+                "exams": s.exams,
                 "images": [{"url": img.url, "alt": img.alt} for img in s.images],
+                "documents": [{"url": doc.url, "alt": doc.alt} for doc in s.documents],
+                "education_options": [
+                    {
+                        "id": opt.id,
+                        "education_level": opt.education_level,
+                        "duration": opt.duration,
+                        "budget_places": opt.budget_places,
+                        "paid_places": opt.paid_places,
+                    }
+                    for opt in s.education_options
+                ],
             }
             for s in specialties
         ]
-        
+
         return {
             "total": total,
             "page": page,
@@ -97,29 +114,48 @@ class GetSpecialtiesUseCase:
 
 class GetSpecialtyByCodeUseCase:
     """Получение специальности по коду."""
-    
+
     def __init__(self, repository: ISpecialtyRepository, fact_repository: IFactRepository):
         self.repository = repository
         self.fact_repository = fact_repository
-    
+
     async def execute(self, code: str) -> dict:
         specialty = await self.repository.get_by_code(code)
         if not specialty:
             raise NotFoundException(f"Специальность с кодом {code} не найдена")
-        
+
         facts_preview = await self.fact_repository.get_titles_by_specialty_code(code)
-        
+
+        # Агрегируем данные из education_options
+        all_durations = [opt.duration for opt in specialty.education_options if opt.duration]
+        total_budget = sum(opt.budget_places for opt in specialty.education_options)
+        total_paid = sum(opt.paid_places for opt in specialty.education_options)
+        education_levels = [opt.education_level for opt in specialty.education_options]
+
         return {
+            "id": specialty.id,
             "code": specialty.code,
             "name": specialty.name,
+            "short_description": specialty.short_description,
             "description": specialty.description,
-            "duration": specialty.duration,
-            "budget_places": specialty.budget_places,
-            "paid_places": specialty.paid_places,
-            "qualification": specialty.qualification,
+            "duration": ", ".join(all_durations) if all_durations else "",
+            "budget_places": total_budget,
+            "paid_places": total_paid,
+            "qualification": ", ".join(education_levels) if education_levels else "",
             "exams": specialty.exams,
             "interesting_facts_preview": facts_preview,
             "images": [{"url": img.url, "alt": img.alt, "caption": img.caption} for img in specialty.images],
+            "documents": [{"url": doc.url, "alt": doc.alt, "caption": doc.caption} for doc in specialty.documents],
+            "education_options": [
+                {
+                    "id": opt.id,
+                    "education_level": opt.education_level,
+                    "duration": opt.duration,
+                    "budget_places": opt.budget_places,
+                    "paid_places": opt.paid_places,
+                }
+                for opt in specialty.education_options
+            ],
         }
 
 
@@ -242,7 +278,8 @@ class GetFAQUseCase:
                 "category": f.category,
                 "show_in_admission": f.show_in_admission,
                 "images": [{"url": img.url, "alt": img.alt, "caption": img.caption} for img in f.images],
-                "documents": [{"url": doc.url, "alt": doc.alt, "caption": doc.caption} for doc in f.documents],
+                "documents": [{"title": doc.title, "file_url": doc.file_url, "file_size": doc.file_size} for doc in f.documents],
+                "document_file_ids": f.document_file_ids,
             }
             for f in faq_list
         ]
@@ -307,6 +344,7 @@ class GetTestQuestionsUseCase:
                 "id": q.id,
                 "text": q.text,
                 "options": q.options,
+                "answer_scores": q.answer_scores,
                 "image_url": q.image_url,
                 "documents": [{"url": doc.url, "alt": doc.alt, "caption": doc.caption} for doc in q.documents],
             }
@@ -325,20 +363,29 @@ class SubmitTestAnswersUseCase:
         # Валидация количества ответов
         if len(answers) != 10:
             raise ValidationException("Должно быть ровно 10 ответов")
-        
+
         # Валидация каждого ответа
         for answer in answers:
             question_id = answer.get("question_id")
             selected = answer.get("selected")
-            
+
             if question_id is None or selected is None:
                 raise ValidationException("Каждый ответ должен содержать question_id и selected")
-            
-            is_valid = await self.repository.validate_answer(question_id, selected)
-            if not is_valid:
-                raise ValidationException(f"Некорректный ответ для вопроса {question_id}")
-        
+
+            # selected может быть строкой или списком
+            if isinstance(selected, list):
+                # Множественный выбор - проверяем каждый вариант
+                for s in selected:
+                    is_valid = await self.repository.validate_answer(question_id, s)
+                    if not is_valid:
+                        raise ValidationException(f"Некорректный ответ для вопроса {question_id}")
+            else:
+                # Одиночный выбор
+                is_valid = await self.repository.validate_answer(question_id, selected)
+                if not is_valid:
+                    raise ValidationException(f"Некорректный ответ для вопроса {question_id}")
+
         # Расчёт рекомендации
         result = await self.repository.calculate_recommendation(answers)
-        
+
         return result
