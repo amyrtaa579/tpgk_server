@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, Button, Form, Row, Col, Card, Spinner, Alert, Nav, Badge } from 'react-bootstrap';
-import { apiService } from '../services/api';
+import { apiService, fixMinioUrls } from '../services/api';
 import type { GalleryImage, UploadResponse } from '../types';
 
 interface MinioImagePickerProps {
@@ -42,7 +42,7 @@ export default function MinioImagePicker({
       setIsLoading(true);
       setError(null);
       const response = await apiService.getGallery(filterCategory === 'all' ? undefined : filterCategory);
-      const items = response.items || [];
+      const items = fixMinioUrls(response.items || []);
       setGalleryImages(items);
       setMinioObjects([]);
 

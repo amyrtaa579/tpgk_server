@@ -16,6 +16,7 @@ from app.infrastructure.models import (
     FAQModel,
     DocumentModel,
     GalleryImageModel,
+    DocumentFileModel,
     TestQuestionModel,
     AboutInfoModel,
     AdmissionInfoModel,
@@ -40,11 +41,20 @@ target_metadata = Base.metadata
 def get_url():
     """Get database URL from environment or config."""
     import os
-    url = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://anmicius:anmicius_secret_password@postgres:5432/anmicius_db"
-    )
-    return url
+    from app.core.config import get_settings
+    
+    # Сначала пробуем получить из переменной окружения
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return url
+    
+    # Если нет, используем настройки приложения
+    try:
+        settings = get_settings()
+        return settings.get_database_url
+    except Exception:
+        # Fallback на стандартный URL (для совместимости)
+        return "postgresql+asyncpg://anmicius:anmicius_secret_password@postgres:5432/anmicius_db"
 
 
 def run_migrations_offline() -> None:

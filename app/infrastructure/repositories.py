@@ -2,17 +2,20 @@
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.models import (
     Specialty,
+    SpecialtyEducationOption,
     InterestingFact,
     News,
     FAQ,
+    FAQDocument,
     Document,
     GalleryImage,
+    DocumentFile,
     TestQuestion,
     AboutInfo,
     AdmissionInfo,
@@ -27,6 +30,7 @@ from app.domain.repositories import (
     IFAQRepository,
     IDocumentRepository,
     IGalleryRepository,
+    IDocumentFileRepository,
     ITestQuestionRepository,
     IAboutRepository,
     IAdmissionRepository,
@@ -34,11 +38,13 @@ from app.domain.repositories import (
 )
 from app.infrastructure.models import (
     SpecialtyModel,
+    SpecialtyEducationModel,
     InterestingFactModel,
     NewsModel,
     FAQModel,
     DocumentModel,
     GalleryImageModel,
+    DocumentFileModel,
     TestQuestionModel,
     AboutInfoModel,
     AdmissionInfoModel,
@@ -59,28 +65,32 @@ def to_image(data: dict) -> Image:
 
 class SpecialtyRepository(ISpecialtyRepository):
     """Репозиторий специальностей."""
-    
+
     def __init__(self, session: AsyncSession):
         self.session = session
-    
-    async def get_by_id(self, id: int) -> Optional[Specialty]:
-        result = await self.session.execute(
-            select(SpecialtyModel).where(SpecialtyModel.id == id)
-        )
+
+    async def get_by_id(self, id: int, include_education: bool = True) -> Optional[Specialty]:
+        query = select(SpecialtyModel)
+        if include_education:
+            query = query.options(selectinload(SpecialtyModel.education_options))
+        query = query.where(SpecialtyModel.id == id)
+        result = await self.session.execute(query)
         model = result.scalar_one_or_none()
         if not model:
             return None
-        return self._to_domain(model)
-    
-    async def get_by_code(self, code: str) -> Optional[Specialty]:
-        result = await self.session.execute(
-            select(SpecialtyModel).where(SpecialtyModel.code == code)
-        )
+        return await self._to_domain(model, include_education)
+
+    async def get_by_code(self, code: str, include_education: bool = True) -> Optional[Specialty]:
+        query = select(SpecialtyModel)
+        if include_education:
+            query = query.options(selectinload(SpecialtyModel.education_options))
+        query = query.where(SpecialtyModel.code == code)
+        result = await self.session.execute(query)
         model = result.scalar_one_or_none()
         if not model:
             return None
-        return self._to_domain(model)
-    
+        return await self._to_domain(model, include_education)
+
     async def get_all(
         self,
         page: int = 1,
@@ -90,50 +100,186 @@ class SpecialtyRepository(ISpecialtyRepository):
         popular: Optional[bool] = None,
     ) -> tuple[list[Specialty], int]:
         offset = (page - 1) * limit
-        
+
         # Построение условий фильтрации
         conditions = []
         if search:
             conditions.append(SpecialtyModel.name.ilike(f"%{search}%"))
         if form == "budget":
-            conditions.append(SpecialtyModel.budget_places > 0)
+            # Фильтр по специальностям с бюджетными местами на любом уровне образования
+            conditions.append(SpecialtyModel.id.in_(
+                select(SpecialtyEducationModel.specialty_id).where(
+                    SpecialtyEducationModel.budget_places > 0
+                )
+            ))
         elif form == "paid":
-            conditions.append(SpecialtyModel.paid_places > 0)
-        if popular is True:
-            conditions.append(SpecialtyModel.is_popular == True)
-        
+            # Фильтр по специальностям с платными местами на любом уровне образования
+            conditions.append(SpecialtyModel.id.in_(
+                select(SpecialtyEducationModel.specialty_id).where(
+                    SpecialtyEducationModel.paid_places > 0
+                )
+            ))
+
         # Получение общего количества
         count_query = select(func.count()).select_from(SpecialtyModel)
         if conditions:
             count_query = count_query.where(and_(*conditions))
         total_result = await self.session.execute(count_query)
         total = total_result.scalar()
-        
+
         # Получение данных
-        query = select(SpecialtyModel)
+        query = select(SpecialtyModel).options(selectinload(SpecialtyModel.education_options))
         if conditions:
             query = query.where(and_(*conditions))
         query = query.offset(offset).limit(limit)
-        
+
         result = await self.session.execute(query)
         models = result.scalars().all()
-        
-        specialties = [self._to_domain(m) for m in models]
+
+        specialties = []
+        for m in models:
+            specialties.append(await self._to_domain(m, include_education=True))
         return specialties, total
-    
+
     async def get_codes_with_budget_or_paid(self, has_budget: bool = True) -> list[str]:
         if has_budget:
             result = await self.session.execute(
-                select(SpecialtyModel.code).where(SpecialtyModel.budget_places > 0)
+                select(SpecialtyModel.code).join(SpecialtyEducationModel).where(
+                    SpecialtyEducationModel.budget_places > 0
+                )
             )
         else:
             result = await self.session.execute(
-                select(SpecialtyModel.code).where(SpecialtyModel.paid_places > 0)
+                select(SpecialtyModel.code).join(SpecialtyEducationModel).where(
+                    SpecialtyEducationModel.paid_places > 0
+                )
             )
         return [row[0] for row in result.all()]
-    
-    def _to_domain(self, model: SpecialtyModel) -> Specialty:
-        return Specialty(
+
+    async def create(
+        self,
+        code: str,
+        name: str,
+        short_description: str = "",
+        description: list[str] = None,
+        exams: list[str] = None,
+        images: list[dict] = None,
+        documents: list[dict] = None,
+        education_options: list[dict] = None,
+    ) -> Specialty:
+        model = SpecialtyModel(
+            code=code,
+            name=name,
+            short_description=short_description,
+            description=description or [],
+            exams=exams or [],
+            images=images or [],
+            documents=documents or [],
+        )
+        self.session.add(model)
+        try:
+            await self.session.flush()  # Получаем model.id
+
+            # Добавляем уровни образования
+            if education_options:
+                for opt in education_options:
+                    edu_model = SpecialtyEducationModel(
+                        specialty_id=model.id,
+                        education_level=opt.get("education_level", "Основное общее"),
+                        duration=opt.get("duration", ""),
+                        budget_places=opt.get("budget_places", 0),
+                        paid_places=opt.get("paid_places", 0),
+                    )
+                    self.session.add(edu_model)
+
+            await self.session.commit()
+            # Явно загружаем education_options после commit через отдельный запрос
+            await self.session.refresh(model)
+            # Используем selectinload для явной загрузки
+            from sqlalchemy.orm import selectinload
+            result = await self.session.execute(
+                select(SpecialtyModel)
+                .options(selectinload(SpecialtyModel.education_options))
+                .where(SpecialtyModel.id == model.id)
+            )
+            model = result.scalar_one_or_none()
+            return await self._to_domain(model, include_education=True)
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def update(
+        self,
+        id: int,
+        code: Optional[str] = None,
+        name: Optional[str] = None,
+        short_description: Optional[str] = None,
+        description: Optional[list[str]] = None,
+        exams: Optional[list[str]] = None,
+        images: Optional[list[dict]] = None,
+        documents: Optional[list[dict]] = None,
+        education_options: Optional[list[dict]] = None,
+    ) -> Specialty:
+        model = await self.session.get(SpecialtyModel, id)
+        if not model:
+            raise ValueError(f"Specialty with id {id} not found")
+
+        if code is not None:
+            model.code = code
+        if name is not None:
+            model.name = name
+        if short_description is not None:
+            model.short_description = short_description
+        if description is not None:
+            model.description = description
+        if exams is not None:
+            model.exams = exams
+        if images is not None:
+            model.images = images
+        if documents is not None:
+            model.documents = documents
+
+        # Обновляем уровни образования
+        if education_options is not None:
+            # Удаляем старые
+            await self.session.execute(
+                delete(SpecialtyEducationModel).where(
+                    SpecialtyEducationModel.specialty_id == id
+                )
+            )
+            # Добавляем новые
+            for opt in education_options:
+                edu_model = SpecialtyEducationModel(
+                    specialty_id=id,
+                    education_level=opt.get("education_level", "Основное общее"),
+                    duration=opt.get("duration", ""),
+                    budget_places=opt.get("budget_places", 0),
+                    paid_places=opt.get("paid_places", 0),
+                )
+                self.session.add(edu_model)
+
+        model.updated_at = datetime.utcnow()
+        await self.session.commit()
+        # Явно загружаем education_options после commit через отдельный запрос
+        await self.session.refresh(model)
+        result = await self.session.execute(
+            select(SpecialtyModel)
+            .options(selectinload(SpecialtyModel.education_options))
+            .where(SpecialtyModel.id == model.id)
+        )
+        model = result.scalar_one_or_none()
+        return await self._to_domain(model, include_education=True)
+
+    async def delete(self, id: int) -> bool:
+        model = await self.session.get(SpecialtyModel, id)
+        if not model:
+            return False
+        await self.session.delete(model)
+        await self.session.commit()
+        return True
+
+    async def _to_domain(self, model: SpecialtyModel, include_education: bool = True) -> Specialty:
+        specialty = Specialty(
             id=model.id,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -141,14 +287,25 @@ class SpecialtyRepository(ISpecialtyRepository):
             name=model.name,
             short_description=model.short_description,
             description=model.description,
-            duration=model.duration,
-            budget_places=model.budget_places,
-            paid_places=model.paid_places,
-            qualification=model.qualification,
             exams=model.exams,
             images=[to_image(img) for img in model.images],
-            is_popular=model.is_popular,
+            documents=[to_image(doc) for doc in model.documents],
+            education_options=[],
         )
+
+        if include_education:
+            # education_options уже загружены через selectinload
+            for edu in model.education_options:
+                specialty.education_options.append(SpecialtyEducationOption(
+                    id=edu.id,
+                    specialty_id=edu.specialty_id,
+                    education_level=edu.education_level,
+                    duration=edu.duration,
+                    budget_places=edu.budget_places,
+                    paid_places=edu.paid_places,
+                ))
+
+        return specialty
 
 
 class FactRepository(IFactRepository):
@@ -257,20 +414,18 @@ class NewsRepository(INewsRepository):
             return None
         return self._to_domain(model)
     
-    async def increment_views(self, slug: str) -> None:
+    async def increment_views(self, slug: str) -> int:
+        """Увеличение счётчика просмотров (оптимизированный запрос)."""
         from sqlalchemy import update
         
+        # Один атомарный UPDATE вместо SELECT + UPDATE
         result = await self.session.execute(
-            select(NewsModel.views).where(NewsModel.slug == slug)
+            update(NewsModel)
+            .where(NewsModel.slug == slug)
+            .values(views=NewsModel.views + 1)
         )
-        current_views = result.scalar()
-        if current_views is not None:
-            await self.session.execute(
-                update(NewsModel)
-                .where(NewsModel.slug == slug)
-                .values(views=current_views + 1)
-            )
-            await self.session.commit()
+        await self.session.commit()
+        return result.rowcount
     
     def _to_domain(self, model: NewsModel) -> News:
         return News(
@@ -320,6 +475,7 @@ class FAQRepository(IFAQRepository):
         show_in_admission: bool,
         images: list[dict],
         documents: list[dict] | None = None,
+        document_file_ids: list[int] | None = None,
     ) -> FAQ:
         model = FAQModel(
             question=question,
@@ -328,6 +484,7 @@ class FAQRepository(IFAQRepository):
             show_in_admission=show_in_admission,
             images=images,
             documents=documents or [],
+            document_file_ids=document_file_ids or [],
         )
         self.session.add(model)
         await self.session.commit()
@@ -343,6 +500,7 @@ class FAQRepository(IFAQRepository):
         show_in_admission: Optional[bool] = None,
         images: Optional[list[dict]] = None,
         documents: Optional[list[dict]] = None,
+        document_file_ids: Optional[list[int]] = None,
     ) -> FAQ:
         model = await self.get_by_id(id)
         if not model:
@@ -361,6 +519,8 @@ class FAQRepository(IFAQRepository):
             db_model.images = images
         if documents is not None:
             db_model.documents = documents
+        if document_file_ids is not None:
+            db_model.document_file_ids = document_file_ids
 
         db_model.updated_at = datetime.utcnow()
         await self.session.commit()
@@ -385,7 +545,15 @@ class FAQRepository(IFAQRepository):
             category=model.category,
             show_in_admission=model.show_in_admission,
             images=[to_image(img) for img in model.images],
-            documents=[to_image(doc) for doc in model.documents],
+            documents=[
+                FAQDocument(
+                    title=doc.get("title", ""),
+                    file_url=doc.get("file_url", ""),
+                    file_size=doc.get("file_size"),
+                )
+                for doc in model.documents
+            ],
+            document_file_ids=model.document_file_ids or [],
         )
 
 
@@ -521,6 +689,42 @@ class GalleryRepository(IGalleryRepository):
         )
 
 
+class DocumentFileRepository(IDocumentFileRepository):
+    """Репозиторий файлов документов."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, id: int) -> Optional[DocumentFile]:
+        result = await self.session.execute(
+            select(DocumentFileModel).where(DocumentFileModel.id == id)
+        )
+        model = result.scalar_one_or_none()
+        if not model:
+            return None
+        return self._to_domain(model)
+
+    async def get_all(self, category: Optional[str] = None) -> list[DocumentFile]:
+        query = select(DocumentFileModel)
+        if category:
+            query = query.where(DocumentFileModel.category == category)
+
+        result = await self.session.execute(query)
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
+    def _to_domain(self, model: DocumentFileModel) -> DocumentFile:
+        return DocumentFile(
+            id=model.id,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            title=model.title,
+            file_url=model.file_url,
+            file_size=model.file_size,
+            category=model.category,
+        )
+
+
 class TestQuestionRepository(ITestQuestionRepository):
     """Репозиторий вопросов теста."""
 
@@ -553,12 +757,14 @@ class TestQuestionRepository(ITestQuestionRepository):
         self,
         text: str,
         options: list[str],
+        answer_scores: list[dict] | None = None,
         image_url: Optional[str] = None,
         documents: list[dict] | None = None,
     ) -> TestQuestion:
         model = TestQuestionModel(
             text=text,
             options=options,
+            answer_scores=answer_scores or [],
             image_url=image_url,
             documents=documents or [],
         )
@@ -572,6 +778,7 @@ class TestQuestionRepository(ITestQuestionRepository):
         id: int,
         text: Optional[str] = None,
         options: Optional[list[str]] = None,
+        answer_scores: Optional[list[dict]] = None,
         image_url: Optional[str] = None,
         documents: Optional[list[dict]] = None,
     ) -> TestQuestion:
@@ -583,6 +790,8 @@ class TestQuestionRepository(ITestQuestionRepository):
             db_model.text = text
         if options is not None:
             db_model.options = options
+        if answer_scores is not None:
+            db_model.answer_scores = answer_scores
         if image_url is not None:
             db_model.image_url = image_url
         if documents is not None:
@@ -613,284 +822,98 @@ class TestQuestionRepository(ITestQuestionRepository):
     async def calculate_recommendation(self, answers: list[dict]) -> dict:
         """
         Расчёт рекомендации на основе ответов.
-        Каждая специальность получает баллы за соответствующие ответы.
+        Использует answer_scores из БД для каждого вопроса.
+        Считает баллы для каждого кода специальности напрямую.
         """
-        # Счётчики для различных направлений
-        scores = {
-            "welder": 0,  # Сварщики
-            "builder": 0,  # Сооруженцы
-            "cook": 0,  # Повара
-            "chemist": 0,  # Химики
-            "kip": 0,  # КИП, электрики
-            "robot": 0,  # Роботизированные системы
-            "operator": 0,  # Операторы химических производств
-        }
-        
+        from app.infrastructure.models import SpecialtyModel
+
+        # Получаем все специальности из БД для маппинга кодов на данные
+        result = await self.session.execute(select(SpecialtyModel))
+        all_specialties = result.scalars().all()
+        specialties_map = {s.code: s for s in all_specialties}
+
+        # Счётчики для каждой специальности (по коду)
+        scores: dict[str, int] = {}
+
+        # Получаем все вопросы из БД
+        questions = await self.get_all()
+        questions_dict = {q.id: q for q in questions}
+
         # Анализ ответов
         for answer in answers:
-            selected = answer.get("selected", "").lower()
             question_id = answer.get("question_id", 0)
-            
-            # Вопрос 1: Любишь ли ты работать физически?
-            if question_id == 1:
-                if "да" in selected:
-                    scores["welder"] += 2
-                    scores["builder"] += 2
-                    scores["cook"] += 1
-                else:
-                    scores["chemist"] += 1
-                    scores["kip"] += 1
-                    scores["robot"] += 1
-            
-            # Вопрос 2: Какая работа нравится?
-            if question_id == 2:
-                if "ручн" in selected or "физическ" in selected:
-                    scores["welder"] += 2
-                    scores["builder"] += 2
-                    scores["cook"] += 2
-                    scores["kip"] += 1
-                elif "автоматизированн" in selected:
-                    scores["kip"] += 2
-                    scores["robot"] += 3  # Больше баллов для робототехники
-                elif "творческ" in selected:
-                    scores["cook"] += 2
-                elif "интеллектуальн" in selected:
-                    scores["chemist"] += 1
-                    scores["kip"] += 1
-                    scores["robot"] += 1
-                    scores["operator"] += 1
-                elif "компьютер" in selected:
-                    scores["robot"] += 2  # Компьютеры -> робототехника
-            
-            # Вопрос 3: Работа на открытом воздухе?
-            if question_id == 3:
-                if "да" in selected:
-                    scores["welder"] += 2
-                    scores["builder"] += 3
-                else:
-                    scores["chemist"] += 1
-                    scores["cook"] += 1
-                    scores["kip"] += 1
-            
-            # Вопрос 4: Предметы в школе
-            if question_id == 4:
-                if "биолог" in selected or "хим" in selected:
-                    scores["chemist"] += 2
-                    scores["cook"] += 1
-                    scores["welder"] += 1
-                if "математик" in selected or "физик" in selected:
-                    scores["kip"] += 2
-                    scores["robot"] += 2
-                    scores["welder"] += 1
-                    scores["builder"] += 1
-                if "геометр" in selected:
-                    scores["welder"] += 2
-                    scores["builder"] += 2
-                if "физкультур" in selected:
-                    scores["welder"] += 1
-                    scores["builder"] += 1
-            
-            # Вопрос 5: Маска
-            if question_id == 5:
-                if "сварочн" in selected:
-                    scores["welder"] += 3
-            
-            # Вопрос 6: Прибор (Амперметр)
-            if question_id == 6:
-                if "амперметр" in selected or "дозиметр" in selected:
-                    scores["kip"] += 3
-                    scores["robot"] += 2
-            
-            # Вопрос 7: Спиртовка
-            if question_id == 7:
-                if "спиртовк" in selected or "горелк" in selected:
-                    scores["chemist"] += 3
-            
-            # Вопрос 8: Инструмент
-            if question_id == 8:
-                if "сварочн" in selected or "шлифовальн" in selected:
-                    scores["welder"] += 3
-                elif "колб" in selected or "пробирк" in selected:
-                    scores["chemist"] += 3
-                elif "вес" in selected or "миксер" in selected:
-                    scores["cook"] += 3
-                elif "отвертк" in selected or "ключ" in selected:
-                    scores["kip"] += 2
-                    scores["robot"] += 2
-            
-            # Вопрос 9: Торт
-            if question_id == 9:
-                if "наполеон" in selected or "красный бархат" in selected:
-                    scores["cook"] += 3
-            
-            # Вопрос 10: Лампа
-            if question_id == 10:
-                if "лампа" in selected:
-                    scores["kip"] += 3
-                    scores["robot"] += 2
-                elif "светодиодн" in selected:
-                    scores["robot"] += 3  # LED -> робототехника
-            
-            # Вопрос 11: Прибор учета электроэнергии
-            if question_id == 11:
-                if "прибор учет" in selected or "электроэнерг" in selected:
-                    scores["kip"] += 3
-                    scores["robot"] += 2
-                elif "газоанализатор" in selected:
-                    scores["chemist"] += 2
-                    scores["operator"] += 2
-            
-            # Вопрос 12: Миксер кондитерский
-            if question_id == 12:
-                if "миксер" in selected:
-                    scores["cook"] += 3
-            
-            # Вопрос 13: Перчатки
-            if question_id == 13:
-                if "сварщик" in selected:
-                    scores["welder"] += 3
-            
-            # Вопрос 14: Химическое производство
-            if question_id == 14:
-                if "химическ" in selected:
-                    scores["chemist"] += 2
-                    scores["operator"] += 3
-            
-            # Вопрос 15: Трубопровод
-            if question_id == 15:
-                if "трубопровод" in selected:
-                    scores["builder"] += 3
-        
-        # Определяем топ-3 специальности
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        
-        # Формируем рекомендации на основе лучших результатов
+            selected_raw = answer.get("selected", "")
+            # Поддержка множественного выбора (список) или одиночного (строка)
+            selected_list = selected_raw if isinstance(selected_raw, list) else [selected_raw]
+
+            question = questions_dict.get(question_id)
+            if not question:
+                continue
+
+            # Получаем answer_scores для вопроса
+            answer_scores = question.answer_scores or []
+            if isinstance(answer_scores, str):
+                import json
+                answer_scores = json.loads(answer_scores)
+
+            # Для каждого выбранного ответа
+            for selected in selected_list:
+                # Ищем соответствующий ответ в answer_scores
+                for score_entry in answer_scores:
+                    if score_entry.get("answer", "").lower() == selected.lower():
+                        # Добавляем баллы специальностям
+                        specialty_codes = score_entry.get("specialties", [])
+                        for code in specialty_codes:
+                            scores[code] = scores.get(code, 0) + 1
+
+        # Сортируем специальности по баллам
+        sorted_codes = sorted(scores.keys(), key=lambda c: scores[c], reverse=True)
+
+        # Формируем топ-3 рекомендаций
         top_specialties = []
-        recommendation_text = ""
-        motivation_text = ""
-        
-        # Логика рекомендаций
-        if sorted_scores[0][0] == "welder" and sorted_scores[0][1] > 0:
+        for code in sorted_codes[:3]:
+            if scores[code] > 0 and code in specialties_map:
+                spec = specialties_map[code]
+                # Получаем данные об местах и duração из education_options
+                total_budget = sum(eo.budget_places for eo in spec.education_options) if spec.education_options else 0
+                total_paid = sum(eo.paid_places for eo in spec.education_options) if spec.education_options else 0
+                duration = spec.education_options[0].duration if spec.education_options else ""
+                top_specialties.append({
+                    "code": spec.code,
+                    "name": spec.name,
+                    "duration": duration,
+                    "budget_places": total_budget,
+                })
+
+        # Если ничего не набрано — дефолтная рекомендация
+        if not top_specialties:
             top_specialties = [
                 {
                     "code": "15.02.19",
                     "name": "Сварочное производство",
                     "duration": "3 г. 10 мес.",
-                    "budget_places": 25
-                },
-                {
-                    "code": "15.01.05",
-                    "name": "Сварщик (ручной и частично механизированной сварки)",
-                    "duration": "1 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам отлично подойдёт направление «Сварочное производство»!"
-            motivation_text = "Вы любите работать руками, интересуетесь техникой и готовы к физической работе. Сварщики — востребованная профессия с высокой зарплатой."
-        
-        elif sorted_scores[0][0] == "builder" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "21.02.03",
-                    "name": "Сооружение и эксплуатация газонефтепроводов и газонефтехранилищ",
-                    "duration": "3 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Сооружение и эксплуатация газонефтепроводов»!"
-            motivation_text = "Вы готовы работать на открытом воздухе и заниматься строительством. Это стабильная профессия в нефтегазовой отрасли."
-        
-        elif sorted_scores[0][0] == "cook" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "19.02.10",
-                    "name": "Технология продукции общественного питания",
-                    "duration": "3 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Поварское дело»!"
-            motivation_text = "У вас есть творческие способности и интерес к приготовлению пищи. Повара — всегда востребованная профессия."
-        
-        elif sorted_scores[0][0] == "chemist" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "18.02.12",
-                    "name": "Технология аналитического контроля химических соединений",
-                    "duration": "3 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Химическая технология»!"
-            motivation_text = "У вас есть интерес к химии и точным наукам. Химики-аналитики работают в лабораториях и на производствах."
-        
-        elif sorted_scores[0][0] == "kip" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "15.01.37",
-                    "name": "Слесарь-наладчик КИПиА",
-                    "duration": "1 г. 10 мес.",
-                    "budget_places": 25
-                },
-                {
-                    "code": "13.01.10",
-                    "name": "Электромонтер по ремонту и обслуживанию электрооборудования",
-                    "duration": "1 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Контрольно-измерительные приборы и автоматика»!"
-            motivation_text = "У вас технический склад ума и интерес к электронике. Специалисты КИПиА и электрики — востребованы на любом производстве."
-        
-        elif sorted_scores[0][0] == "robot" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "15.02.18",
-                    "name": "Техническая эксплуатация роботизированного производства",
-                    "duration": "3 г. 10 мес.",
-                    "budget_places": 50
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Роботизированное производство»!"
-            motivation_text = "Вас интересуют автоматизация и роботы. Это современная и перспективная область промышленности."
-        
-        elif sorted_scores[0][0] == "operator" and sorted_scores[0][1] > 0:
-            top_specialties = [
-                {
-                    "code": "18.01.35",
-                    "name": "Аппаратчик-оператор производства химических соединений",
-                    "duration": "1 г. 10 мес.",
-                    "budget_places": 25
-                }
-            ]
-            recommendation_text = "Вам подойдёт направление «Оператор химического производства»!"
-            motivation_text = "Вы готовы работать на химическом производстве. Это стабильная работа с хорошими перспективами."
-        
-        else:
-            # Если ни одна специальность не набрала баллов
-            top_specialties = [
-                {
-                    "code": "15.02.19",
-                    "name": "Сварочное производство",
-                    "duration": "3 г. 10 мес.",
-                    "budget_places": 25
+                    "budget_places": 25,
                 },
                 {
                     "code": "21.02.03",
                     "name": "Сооружение и эксплуатация газонефтепроводов",
                     "duration": "3 г. 10 мес.",
-                    "budget_places": 25
-                }
+                    "budget_places": 25,
+                },
             ]
             recommendation_text = "Вам могут подойти технические специальности нашего колледжа!"
             motivation_text = "Рекомендуем пройти тест ещё раз или обратиться к приёмной комиссии для индивидуальной консультации."
-        
+        else:
+            best = top_specialties[0]
+            recommendation_text = f"Вам подойдёт направление «{best['name']}»!"
+            motivation_text = f"На основе ваших ответов рекомендуем рассмотреть специальность {best['code']} {best['name']}."
+
         return {
             "recommendation": recommendation_text,
             "motivation": motivation_text,
             "recommended_specialties": top_specialties,
         }
-    
+
     def _to_domain(self, model: TestQuestionModel) -> TestQuestion:
         return TestQuestion(
             id=model.id,
@@ -898,6 +921,7 @@ class TestQuestionRepository(ITestQuestionRepository):
             updated_at=model.updated_at,
             text=model.text,
             options=model.options,
+            answer_scores=model.answer_scores,
             image_url=model.image_url,
             documents=model.documents,
         )
@@ -981,7 +1005,7 @@ class AboutRepository(IAboutRepository):
 
 class AdmissionRepository(IAdmissionRepository):
     """Репозиторий информации о приёмной кампании."""
-    
+
     def __init__(self, session: AsyncSession, specialty_repository: SpecialtyRepository):
         self.session = session
         self.specialty_repository = specialty_repository
@@ -991,87 +1015,16 @@ class AdmissionRepository(IAdmissionRepository):
             select(AdmissionInfoModel).where(AdmissionInfoModel.year == year)
         )
         model = result.scalar_one_or_none()
-        
+
         if not model:
-            # Получаем специальности с местами
-            codes = await self.specialty_repository.get_codes_with_budget_or_paid(has_budget=True)
-            specialties_data = []
-            
-            for code in codes[:5]:  # Берём первые 5 для примера
-                specialty = await self.specialty_repository.get_by_code(code)
-                if specialty:
-                    specialties_data.append({
-                        "code": specialty.code,
-                        "name": specialty.name,
-                        "budget_places": specialty.budget_places,
-                        "paid_places": specialty.paid_places,
-                        "exams": specialty.exams,
-                        "duration": specialty.duration,
-                    })
-            
-            # Данные по умолчанию
+            # Нет данных — возвращаем пустую структуру (пользователь заполнит через админку)
             return AdmissionInfo(
                 year=year,
-                specialties_admission=specialties_data if specialties_data else [
-                    {
-                        "code": "15.02.19",
-                        "name": "Сварочное производство",
-                        "budget_places": 25,
-                        "paid_places": 15,
-                        "exams": ["Математика", "Русский язык", "Физика"],
-                        "duration": "3 г. 10 мес.",
-                    },
-                    {
-                        "code": "22.02.06",
-                        "name": "Сварочное производство (по отраслям)",
-                        "budget_places": 25,
-                        "paid_places": 15,
-                        "exams": ["Математика", "Русский язык", "Физика"],
-                        "duration": "3 г. 10 мес.",
-                    },
-                ],
-                submission_methods=[
-                    SubmissionMethod(
-                        title="Лично в приёмную комиссию",
-                        description="г. Стрежевой, ул. Промышленная, д. 15, каб. 101",
-                        link=None,
-                    ),
-                    SubmissionMethod(
-                        title="Через портал Госуслуги",
-                        description="Подайте заявление онлайн, не выходя из дома",
-                        link="https://www.gosuslugi.ru",
-                    ),
-                    SubmissionMethod(
-                        title="Почтой России",
-                        description="Отправьте документы заказным письмом с уведомлением",
-                        link=None,
-                    ),
-                ],
-                important_dates=[
-                    ImportantDate(
-                        title="Начало приёма документов",
-                        date=datetime(year, 6, 20),
-                        description=None,
-                    ),
-                    ImportantDate(
-                        title="Завершение приёма документов (бюджет)",
-                        date=datetime(year, 8, 15),
-                        description="Для поступающих по результатам ЕГЭ",
-                    ),
-                ],
-                faq_highlights=[
-                    {
-                        "question": "Можно ли подать документы без ЕГЭ?",
-                        "answer": "Да, для выпускников колледжей и техникумов предусмотрены вступительные испытания на базе колледжа.",
-                    },
-                    {
-                        "question": "Есть ли общежитие?",
-                        "answer": "Да, иногородним студентам предоставляется общежитие. Количество мест ограничено.",
-                    },
-                ],
+                specialties_admission=[],
+                submission_methods=[],
+                important_dates=[],
             )
-        
-        # Конвертация данных из модели
+
         submission_methods = [
             SubmissionMethod(
                 title=m.get("title", ""),
@@ -1080,7 +1033,7 @@ class AdmissionRepository(IAdmissionRepository):
             )
             for m in model.submission_methods
         ]
-        
+
         important_dates = [
             ImportantDate(
                 title=d.get("title", ""),
@@ -1095,7 +1048,6 @@ class AdmissionRepository(IAdmissionRepository):
             specialties_admission=model.specialties_admission,
             submission_methods=submission_methods,
             important_dates=important_dates,
-            faq_highlights=model.faq_highlights,
         )
 
 
@@ -1143,12 +1095,12 @@ class UserRepository(IUserRepository):
 
     async def update(self, user: "User") -> "User":
         from app.core.jwt import get_password_hash
-        
+
         result = await self.session.execute(select(UserModel).where(UserModel.id == user.id))
         model = result.scalar_one_or_none()
         if not model:
             raise ValueError(f"User with id {user.id} not found")
-        
+
         # Обновляем поля
         if hasattr(user, 'email') and user.email:
             model.email = user.email
@@ -1158,10 +1110,53 @@ class UserRepository(IUserRepository):
             model.is_active = user.is_active
         if hasattr(user, 'is_superuser'):
             model.is_superuser = user.is_superuser
-        
+
         await self.session.commit()
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    async def update_with_password(self, user: "User", password: str) -> "User":
+        """Обновление пользователя с паролем (с инвалидацией токенов)."""
+        from app.core.jwt import get_password_hash
+
+        result = await self.session.execute(select(UserModel).where(UserModel.id == user.id))
+        model = result.scalar_one_or_none()
+        if not model:
+            raise ValueError(f"User with id {user.id} not found")
+
+        # Обновляем поля
+        if hasattr(user, 'email') and user.email:
+            model.email = user.email
+        if hasattr(user, 'username') and user.username:
+            model.username = user.username
+        if hasattr(user, 'is_active'):
+            model.is_active = user.is_active
+        if hasattr(user, 'is_superuser'):
+            model.is_superuser = user.is_superuser
+
+        # Обновляем пароль и инвалидируем все токены
+        if password:
+            model.hashed_password = get_password_hash(password)
+            # Инвалидируем все refresh токены пользователя
+            await self.delete_all_refresh_tokens(user.id)
+
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def delete_all_refresh_tokens(self, user_id: int) -> bool:
+        """Удаление всех refresh токенов пользователя."""
+        result = await self.session.execute(
+            select(RefreshTokenModel).where(RefreshTokenModel.user_id == user_id)
+        )
+        tokens = result.scalars().all()
+        if not tokens:
+            return False
+
+        for token in tokens:
+            await self.session.delete(token)
+        await self.session.commit()
+        return True
 
     async def delete(self, id: int) -> bool:
         result = await self.session.execute(select(UserModel).where(UserModel.id == id))

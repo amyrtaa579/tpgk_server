@@ -12,6 +12,7 @@ const menuItems = [
   { path: '/specialties', label: 'Специальности', icon: '📚' },
   { path: '/news', label: 'Новости', icon: '📰' },
   { path: '/facts', label: 'Факты', icon: '💡' },
+  { path: '/admission', label: 'Приёмная кампания', icon: '🎓' },
   { path: '/faq', label: 'FAQ', icon: '❓' },
   { path: '/documents', label: 'Документы', icon: '📄' },
   { path: '/about', label: 'О колледже', icon: 'ℹ️' },
@@ -53,7 +54,7 @@ export default function Layout({ children }: LayoutProps) {
           {menuItems.map((item) => (
             <Nav.Link
               key={item.path}
-              as={Link}
+              as={Link as any}
               to={item.path}
               onClick={() => setSidebarOpen(false)}
               active={location.pathname === item.path}
@@ -89,7 +90,7 @@ export default function Layout({ children }: LayoutProps) {
             ☰
           </Button>
 
-          <Navbar.Brand as={Link} to="/">
+          <Navbar.Brand as={Link as any} to="/">
             Anmicius API
           </Navbar.Brand>
 

@@ -51,7 +51,7 @@ export default function TestQuestionsListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Вопросы теста профориентации</h2>
-        <Button variant="success" as={Link} to="/test-questions/new">
+        <Button variant="success" as={Link as any} to="/test-questions/new">
           + Новый вопрос
         </Button>
       </div>
@@ -99,7 +99,7 @@ export default function TestQuestionsListPage() {
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/test-questions/${q.id}/edit`}
                       >
                         Редактировать

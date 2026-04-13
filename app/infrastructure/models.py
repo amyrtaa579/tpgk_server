@@ -10,36 +10,58 @@ from sqlalchemy import (
     ForeignKey,
     ARRAY,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.infrastructure.database import Base
 
 
 class SpecialtyModel(Base):
-    """ORM модель специальности."""
-    
+    """ORM модель специальности (основная информация)."""
+
     __tablename__ = "specialties"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     short_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     description: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    duration: Mapped[str] = mapped_column(String(50), nullable=False, default="")
-    budget_places: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    paid_places: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    qualification: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     exams: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     images: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
-    is_popular: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    documents: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # Связь с уровнями образования
+    education_options: Mapped[list["SpecialtyEducationModel"]] = relationship(
+        "SpecialtyEducationModel",
+        back_populates="specialty",
+        cascade="all, delete-orphan",
+    )
+
     facts: Mapped[list["InterestingFactModel"]] = relationship(
         "InterestingFactModel",
         back_populates="specialty",
         cascade="all, delete-orphan",
     )
+
+
+class SpecialtyEducationModel(Base):
+    """ORM модель уровня образования специальности."""
+
+    __tablename__ = "specialty_education_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    specialty_id: Mapped[int] = mapped_column(Integer, ForeignKey("specialties.id", ondelete="CASCADE"), nullable=False, index=True)
+    education_level: Mapped[str] = mapped_column(String(100), nullable=False)  # "Основное общее", "Среднее общее"
+    duration: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    budget_places: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    paid_places: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Обратная связь
+    specialty: Mapped["SpecialtyModel"] = relationship("SpecialtyModel", back_populates="education_options")
 
 
 class InterestingFactModel(Base):
@@ -60,9 +82,9 @@ class InterestingFactModel(Base):
 
 class NewsModel(Base):
     """ORM модель новости."""
-    
+
     __tablename__ = "news"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
@@ -70,7 +92,7 @@ class NewsModel(Base):
     content: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     preview_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     gallery: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
-    published_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    published_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     views: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -88,6 +110,7 @@ class FAQModel(Base):
     show_in_admission: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     images: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     documents: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    document_file_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -109,9 +132,9 @@ class DocumentModel(Base):
 
 class GalleryImageModel(Base):
     """ORM модель изображения галереи."""
-    
+
     __tablename__ = "gallery_images"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     thumbnail: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -119,6 +142,20 @@ class GalleryImageModel(Base):
     category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     caption: Mapped[str | None] = mapped_column(String(255), nullable=True)
     date_taken: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DocumentFileModel(Base):
+    """ORM модель файла документа (для галереи документов)."""
+
+    __tablename__ = "document_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=False, index=True, default="common")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -131,6 +168,7 @@ class TestQuestionModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    answer_scores: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)  # [{"answer": "Да", "specialties": ["welder", "builder", "cook"]}]
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     documents: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -160,7 +198,6 @@ class AdmissionInfoModel(Base):
     specialties_admission: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     submission_methods: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     important_dates: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
-    faq_highlights: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -194,7 +231,7 @@ class RefreshTokenModel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    token: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
+    token: Mapped[str] = mapped_column(String(500), nullable=False, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

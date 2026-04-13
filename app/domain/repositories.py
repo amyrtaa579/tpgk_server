@@ -9,6 +9,7 @@ from app.domain.models import (
     FAQ,
     Document,
     GalleryImage,
+    DocumentFile,
     TestQuestion,
     AboutInfo,
     AdmissionInfo,
@@ -26,7 +27,7 @@ class IRepository(ABC):
 
 class ISpecialtyRepository(IRepository, ABC):
     """Интерфейс репозитория специальностей."""
-    
+
     @abstractmethod
     async def get_all(
         self,
@@ -38,15 +39,51 @@ class ISpecialtyRepository(IRepository, ABC):
     ) -> tuple[list[Specialty], int]:
         """Получить список специальностей с пагинацией."""
         pass
-    
+
     @abstractmethod
     async def get_by_code(self, code: str) -> Optional[Specialty]:
         """Получить специальность по коду."""
         pass
-    
+
     @abstractmethod
     async def get_codes_with_budget_or_paid(self, has_budget: bool = True) -> list[str]:
         """Получить коды специальностей с бюджетными/платными местами."""
+        pass
+
+    @abstractmethod
+    async def create(
+        self,
+        code: str,
+        name: str,
+        short_description: str = "",
+        description: list[str] = None,
+        exams: list[str] = None,
+        images: list[dict] = None,
+        documents: list[dict] = None,
+        education_options: list[dict] = None,
+    ) -> Specialty:
+        """Создать специальность."""
+        pass
+
+    @abstractmethod
+    async def update(
+        self,
+        id: int,
+        code: Optional[str] = None,
+        name: Optional[str] = None,
+        short_description: Optional[str] = None,
+        description: Optional[list[str]] = None,
+        exams: Optional[list[str]] = None,
+        images: Optional[list[dict]] = None,
+        documents: Optional[list[dict]] = None,
+        education_options: Optional[list[dict]] = None,
+    ) -> Specialty:
+        """Обновить специальность."""
+        pass
+
+    @abstractmethod
+    async def delete(self, id: int) -> bool:
+        """Удалить специальность."""
         pass
 
 
@@ -170,10 +207,19 @@ class IDocumentRepository(IRepository, ABC):
 
 class IGalleryRepository(IRepository, ABC):
     """Интерфейс репозитория галереи."""
-    
+
     @abstractmethod
     async def get_all(self, category: Optional[str] = None) -> list[GalleryImage]:
         """Получить все изображения с фильтрацией по категории."""
+        pass
+
+
+class IDocumentFileRepository(IRepository, ABC):
+    """Интерфейс репозитория файлов документов."""
+
+    @abstractmethod
+    async def get_all(self, category: Optional[str] = None) -> list[DocumentFile]:
+        """Получить все файлы с фильтрацией по категории."""
         pass
 
 

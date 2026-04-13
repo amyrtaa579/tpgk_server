@@ -97,7 +97,7 @@ export default function GalleryFormPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>{isEdit ? 'Редактирование изображения' : 'Добавить изображение в галерею'}</h2>
-        <Button variant="secondary" as={Link} to="/gallery">
+        <Button variant="secondary" as={Link as any} to="/gallery">
           Назад к списку
         </Button>
       </div>
@@ -202,7 +202,7 @@ export default function GalleryFormPage() {
               <Button variant="primary" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/gallery">
+              <Button variant="secondary" as={Link as any} to="/gallery">
                 Отмена
               </Button>
             </div>

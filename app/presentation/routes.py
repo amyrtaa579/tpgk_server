@@ -46,6 +46,7 @@ from app.infrastructure.repositories import (
     AdmissionRepository,
 )
 from app.infrastructure.database import get_db_session
+from app.infrastructure.cache import cache_service
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -57,9 +58,17 @@ def create_v1_router() -> APIRouter:
     @router.get("/about", response_model=AboutResponse, summary="Информация о колледже")
     async def get_about(session: AsyncSession = Depends(get_db_session)):
         """Получение общей информации о колледже."""
+        # Пробуем получить из кэша
+        cached = await cache_service.get("about", group="public")
+        if cached is not None:
+            return cached
+
         repository = AboutRepository(session)
         use_case = GetAboutInfoUseCase(repository)
         result = await use_case.execute()
+
+        # Сохраняем в кэш
+        await cache_service.set("about", result, group="public", ttl=3600)
         return result
     
     # === /admission ===
@@ -86,9 +95,26 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение списка всех специальностей с фильтрацией и пагинацией."""
+        # Формируем ключ кэша на основе параметров
+        cache_key = f"specialties:p{page}:l{limit}"
+        if search:
+            cache_key += f":s{search}"
+        if form:
+            cache_key += f":f{form}"
+        if popular:
+            cache_key += ":pop"
+
+        # Пробуем получить из кэша
+        cached = await cache_service.get(cache_key, group="public")
+        if cached is not None:
+            return cached
+
         repository = SpecialtyRepository(session)
         use_case = GetSpecialtiesUseCase(repository)
         result = await use_case.execute(page=page, limit=limit, search=search, form=form, popular=popular)
+
+        # Сохраняем в кэш
+        await cache_service.set(cache_key, result, group="public", ttl=300)
         return result
     
     # === /specialties/{code} ===
@@ -98,10 +124,18 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение полной информации о конкретной специальности."""
+        # Пробуем получить из кэша
+        cached = await cache_service.get(f"specialty:{code}", group="public")
+        if cached is not None:
+            return cached
+
         specialty_repo = SpecialtyRepository(session)
         fact_repo = FactRepository(session)
         use_case = GetSpecialtyByCodeUseCase(specialty_repo, fact_repo)
         result = await use_case.execute(code)
+
+        # Сохраняем в кэш
+        await cache_service.set(f"specialty:{code}", result, group="public", ttl=600)
         return result
     
     # === /specialties/{code}/facts ===
@@ -111,11 +145,19 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение заголовков интересных фактов для специальности."""
+        # Пробуем получить из кэша
+        cached = await cache_service.get(f"facts:{code}", group="public")
+        if cached is not None:
+            return cached
+
         repository = FactRepository(session)
         use_case = GetFactTitlesBySpecialtyUseCase(repository)
         result = await use_case.execute(code)
+
+        # Сохраняем в кэш
+        await cache_service.set(f"facts:{code}", result, group="public", ttl=600)
         return result
-    
+
     # === /facts/{fact_id} ===
     @router.get("/facts/{fact_id}", response_model=FactDetailResponse, summary="Детали факта")
     async def get_fact(
@@ -123,11 +165,19 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение полного содержимого интересного факта."""
+        # Пробуем получить из кэша
+        cached = await cache_service.get(f"fact:{fact_id}", group="public")
+        if cached is not None:
+            return cached
+
         repository = FactRepository(session)
         use_case = GetFactByIdUseCase(repository)
         result = await use_case.execute(fact_id)
+
+        # Сохраняем в кэш
+        await cache_service.set(f"fact:{fact_id}", result, group="public", ttl=600)
         return result
-    
+
     # === /news ===
     @router.get("/news", response_model=NewsListResponse, summary="Список новостей")
     async def get_news(
@@ -137,11 +187,24 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение списка новостей с пагинацией."""
+        # Формируем ключ кэша
+        cache_key = f"news:p{page}:l{limit}"
+        if search:
+            cache_key += f":s{search}"
+
+        # Пробуем получить из кэша
+        cached = await cache_service.get(cache_key, group="public")
+        if cached is not None:
+            return cached
+
         repository = NewsRepository(session)
         use_case = GetNewsUseCase(repository)
         result = await use_case.execute(page=page, limit=limit, search=search)
+
+        # Сохраняем в кэш
+        await cache_service.set(cache_key, result, group="public", ttl=300)
         return result
-    
+
     # === /news/{slug} ===
     @router.get("/news/{slug}", response_model=NewsDetailResponse, summary="Детали новости")
     async def get_news_by_slug(
@@ -149,11 +212,19 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение полной новости с содержимым и галереей."""
+        # Пробуем получить из кэша
+        cached = await cache_service.get(f"news:{slug}", group="public")
+        if cached is not None:
+            return cached
+
         repository = NewsRepository(session)
         use_case = GetNewsBySlugUseCase(repository)
         result = await use_case.execute(slug)
+
+        # Сохраняем в кэш
+        await cache_service.set(f"news:{slug}", result, group="public", ttl=600)
         return result
-    
+
     # === /faq ===
     @router.get("/faq", response_model=list[FAQItemSchema], summary="Часто задаваемые вопросы")
     async def get_faq(
@@ -161,11 +232,20 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение списка FAQ с фильтрацией по категории."""
+        # Пробуем получить из кэша
+        cache_key = f"faq:{category or 'all'}"
+        cached = await cache_service.get(cache_key, group="public")
+        if cached is not None:
+            return cached
+
         repository = FAQRepository(session)
         use_case = GetFAQUseCase(repository)
         result = await use_case.execute(category=category)
+
+        # Сохраняем в кэш
+        await cache_service.set(cache_key, result, group="public", ttl=600)
         return result
-    
+
     # === /documents ===
     @router.get("/documents", response_model=list[DocumentItemSchema], summary="Документы")
     async def get_documents(
@@ -173,11 +253,20 @@ def create_v1_router() -> APIRouter:
         session: AsyncSession = Depends(get_db_session),
     ):
         """Получение списка документов для скачивания."""
+        # Пробуем получить из кэша
+        cache_key = f"documents:{category or 'all'}"
+        cached = await cache_service.get(cache_key, group="public")
+        if cached is not None:
+            return cached
+
         repository = DocumentRepository(session)
         use_case = GetDocumentsUseCase(repository)
         result = await use_case.execute(category=category)
+
+        # Сохраняем в кэш
+        await cache_service.set(cache_key, result, group="public", ttl=600)
         return result
-    
+
     # === /images ===
     @router.get("/images", response_model=list[GalleryItemDetailSchema], summary="Галерея изображений")
     async def get_gallery(

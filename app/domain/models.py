@@ -26,20 +26,30 @@ class Image:
 
 
 @dataclass
+class SpecialtyEducationOption:
+    """Уровень образования специальности."""
+    id: Optional[int] = None
+    specialty_id: int = 0
+    education_level: str = ""  # "Основное общее", "Среднее общее"
+    duration: str = ""
+    budget_places: int = 0
+    paid_places: int = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+@dataclass
 class Specialty(BaseEntity):
     """Специальность колледжа."""
-    
+
     code: str = ""
     name: str = ""
     short_description: str = ""
     description: list[str] = field(default_factory=list)
-    duration: str = ""
-    budget_places: int = 0
-    paid_places: int = 0
-    qualification: str = ""
     exams: list[str] = field(default_factory=list)
     images: list[Image] = field(default_factory=list)
-    is_popular: bool = False
+    documents: list[Image] = field(default_factory=list)
+    education_options: list[SpecialtyEducationOption] = field(default_factory=list)
 
 
 @dataclass
@@ -67,6 +77,15 @@ class News(BaseEntity):
 
 
 @dataclass
+class FAQDocument:
+    """Документ в FAQ."""
+
+    title: str = ""
+    file_url: str = ""
+    file_size: Optional[int] = None
+
+
+@dataclass
 class FAQ(BaseEntity):
     """Часто задаваемый вопрос."""
 
@@ -75,7 +94,8 @@ class FAQ(BaseEntity):
     category: str = ""
     show_in_admission: bool = False
     images: list[Image] = field(default_factory=list)
-    documents: list[Image] = field(default_factory=list)
+    documents: list[FAQDocument] = field(default_factory=list)
+    document_file_ids: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -107,6 +127,7 @@ class TestQuestion(BaseEntity):
 
     text: str = ""
     options: list[str] = field(default_factory=list)
+    answer_scores: list[dict] = field(default_factory=list)  # [{"answer": "Да", "specialties": ["welder", "builder", "cook"]}]
     image_url: Optional[str] = None
     documents: list[Image] = field(default_factory=list)
 
@@ -163,7 +184,16 @@ class AdmissionInfo:
     specialties_admission: list[dict]
     submission_methods: list[SubmissionMethod]
     important_dates: list[ImportantDate]
-    faq_highlights: list[dict]
+
+
+@dataclass
+class DocumentFile(BaseEntity):
+    """Файл документа."""
+
+    title: str = ""
+    file_url: str = ""
+    file_size: Optional[int] = None
+    category: str = "common"
 
 
 @dataclass

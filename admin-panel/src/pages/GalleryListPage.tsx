@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Card, Spinner, Alert, Badge, Form, Image as BSImage, Nav } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { apiService } from '../services/api';
+import { apiService, fixMinioUrls } from '../services/api';
 import type { GalleryImage } from '../types';
 
 interface MinioObject {
@@ -23,7 +23,7 @@ export default function GalleryListPage() {
       setIsLoading(true);
       setError(null);
       const response = await apiService.getGallery(categoryFilter === 'all' ? undefined : categoryFilter);
-      setImages(response.items);
+      setImages(fixMinioUrls(response.items));
     } catch {
       setError('Не удалось загрузить изображения');
     } finally {
@@ -105,7 +105,7 @@ export default function GalleryListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Галерея изображений</h2>
-        <Button variant="warning" as={Link} to="/gallery/new">
+        <Button variant="warning" as={Link as any} to="/gallery/new">
           + Добавить изображение
         </Button>
       </div>
@@ -182,7 +182,7 @@ export default function GalleryListPage() {
                             variant="outline-primary"
                             size="sm"
                             className="me-2"
-                            as={Link}
+                            as={Link as any}
                             to={`/gallery/${img.id}/edit`}
                           >
                             Редактировать

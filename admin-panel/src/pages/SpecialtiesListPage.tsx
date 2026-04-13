@@ -51,7 +51,7 @@ export default function SpecialtiesListPage() {
     <Container fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Специальности</h2>
-        <Button variant="primary" as={Link} to="/specialties/new">
+        <Button variant="primary" as={Link as any} to="/specialties/new">
           + Новая специальность
         </Button>
       </div>
@@ -68,7 +68,6 @@ export default function SpecialtiesListPage() {
                 <tr>
                   <th>Код</th>
                   <th>Название</th>
-                  <th>Популярная</th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -80,18 +79,11 @@ export default function SpecialtiesListPage() {
                     </td>
                     <td>{specialty.name}</td>
                     <td>
-                      {specialty.is_popular ? (
-                        <Badge bg="warning">Да</Badge>
-                      ) : (
-                        <Badge bg="secondary">Нет</Badge>
-                      )}
-                    </td>
-                    <td>
                       <Button
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/specialties/${specialty.id}/edit`}
                       >
                         Редактировать

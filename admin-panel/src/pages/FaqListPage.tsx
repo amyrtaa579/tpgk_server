@@ -51,7 +51,7 @@ export default function FaqListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Часто задаваемые вопросы (FAQ)</h2>
-        <Button variant="success" as={Link} to="/faq/new">
+        <Button variant="success" as={Link as any} to="/faq/new">
           + Новый вопрос
         </Button>
       </div>
@@ -93,7 +93,7 @@ export default function FaqListPage() {
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/faq/${item.id}/edit`}
                       >
                         Редактировать

@@ -51,7 +51,7 @@ export default function FactsListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Интересные факты</h2>
-        <Button variant="info" as={Link} to="/facts/new">
+        <Button variant="info" as={Link as any} to="/facts/new">
           + Новый факт
         </Button>
       </div>
@@ -85,7 +85,7 @@ export default function FactsListPage() {
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/facts/${fact.id}/edit`}
                       >
                         Редактировать

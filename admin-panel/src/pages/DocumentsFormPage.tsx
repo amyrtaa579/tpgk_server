@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Form, Button, Card, Alert, Spinner, Row, Col } from 'react-bootstrap';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
+import MinioDocumentPicker from '../components/MinioDocumentPicker';
 import MinioImagePicker from '../components/MinioImagePicker';
 import type { Image, Document } from '../types';
 
@@ -21,6 +22,7 @@ export default function DocumentFormPage() {
   const [isLoading, setIsLoading] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDocumentPicker, setShowDocumentPicker] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
 
@@ -88,6 +90,15 @@ export default function DocumentFormPage() {
     }
   };
 
+  const handleDocumentSelect = (documentUrl: string, title: string) => {
+    setFormData({
+      ...formData,
+      file_url: documentUrl,
+      title: title || formData.title,
+    });
+    setShowDocumentPicker(false);
+  };
+
   const handleImageSelect = (imageUrl: string) => {
     const newImage: Image = { url: imageUrl, alt: 'Изображение документа' };
     setFormData({ ...formData, images: [...formData.images, newImage] });
@@ -110,7 +121,7 @@ export default function DocumentFormPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>{isEdit ? 'Редактирование документа' : 'Новый документ'}</h2>
-        <Button variant="secondary" as={Link} to="/documents">
+        <Button variant="secondary" as={Link as any} to="/documents">
           Назад к списку
         </Button>
       </div>
@@ -158,6 +169,14 @@ export default function DocumentFormPage() {
                     ✓ Файл загружен: {formData.file_url}
                   </Alert>
                   <Button
+                    variant="outline-primary"
+                    size="sm"
+                    className="me-2"
+                    onClick={() => setShowDocumentPicker(true)}
+                  >
+                    Изменить
+                  </Button>
+                  <Button
                     variant="outline-danger"
                     size="sm"
                     onClick={() => setFormData({ ...formData, file_url: '', file_size: undefined })}
@@ -167,6 +186,16 @@ export default function DocumentFormPage() {
                 </div>
               ) : (
                 <>
+                  <div className="mb-2">
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      className="me-2"
+                      onClick={() => setShowDocumentPicker(true)}
+                    >
+                      Выбрать из галереи документов
+                    </Button>
+                  </div>
                   <Form.Control
                     type="file"
                     onChange={handleFileUpload}
@@ -176,7 +205,7 @@ export default function DocumentFormPage() {
                     <Spinner animation="border" size="sm" className="ms-2" />
                   )}
                   <Form.Text className="text-muted">
-                    Загрузите файл документа (PDF, DOC, DOCX)
+                    Загрузите файл документа (PDF, DOC, DOCX) или выберите из галереи
                   </Form.Text>
                 </>
               )}
@@ -218,7 +247,7 @@ export default function DocumentFormPage() {
               <Button variant="success" type="submit" disabled={isSubmitting || !formData.file_url}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/documents">
+              <Button variant="secondary" as={Link as any} to="/documents">
                 Отмена
               </Button>
             </div>
@@ -231,6 +260,14 @@ export default function DocumentFormPage() {
         onHide={() => setShowImagePicker(false)}
         onSelect={handleImageSelect}
         hideMinioTab={true}
+      />
+
+      <MinioDocumentPicker
+        show={showDocumentPicker}
+        onHide={() => setShowDocumentPicker(false)}
+        onSelect={handleDocumentSelect}
+        hideGalleryTab={false}
+        hideMinioTab={false}
       />
     </div>
   );

@@ -155,7 +155,7 @@ export default function DashboardPage() {
                 <div className="display-4 mb-2">{stat.icon}</div>
                 <h3 className={`text-${stat.color}`}>{stat.value}</h3>
                 <p className="text-muted mb-3">{stat.title}</p>
-                <Button variant={`outline-${stat.color}`} size="sm" as={Link} to={stat.link}>
+                <Button variant={`outline-${stat.color}`} size="sm" as={Link as any} to={stat.link}>
                   Управление
                 </Button>
               </Card.Body>
@@ -172,25 +172,25 @@ export default function DashboardPage() {
             </Card.Header>
             <Card.Body>
               <div className="d-flex flex-wrap gap-2">
-                <Button variant="primary" as={Link} to="/specialties/new">
+                <Button variant="primary" as={Link as any} to="/specialties/new">
                   + Новая специальность
                 </Button>
-                <Button variant="success" as={Link} to="/news/new">
+                <Button variant="success" as={Link as any} to="/news/new">
                   + Новая новость
                 </Button>
-                <Button variant="info" as={Link} to="/facts/new">
+                <Button variant="info" as={Link as any} to="/facts/new">
                   + Новый факт
                 </Button>
-                <Button variant="secondary" as={Link} to="/faq/new">
+                <Button variant="secondary" as={Link as any} to="/faq/new">
                   + Новый вопрос FAQ
                 </Button>
-                <Button variant="dark" as={Link} to="/documents/new">
+                <Button variant="dark" as={Link as any} to="/documents/new">
                   + Новый документ
                 </Button>
-                <Button variant="warning" as={Link} to="/test-questions/new">
+                <Button variant="warning" as={Link as any} to="/test-questions/new">
                   + Новый вопрос теста
                 </Button>
-                <Button variant="warning" as={Link} to="/gallery/new">
+                <Button variant="warning" as={Link as any} to="/gallery/new">
                   + Изображение в галерею
                 </Button>
               </div>

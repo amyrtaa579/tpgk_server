@@ -43,19 +43,24 @@ export interface UserUpdate {
 }
 
 // Specialty
+export interface SpecialtyEducationOption {
+  id?: number;
+  education_level: string;
+  duration: string;
+  budget_places: number;
+  paid_places: number;
+}
+
 export interface Specialty {
   id: number;
   code: string;
   name: string;
   short_description: string;
   description: string[];
-  duration: string;
-  budget_places: number;
-  paid_places: number;
-  qualification: string;
   exams: string[];
   images: Image[];
-  is_popular: boolean;
+  documents: Image[];
+  education_options: SpecialtyEducationOption[];
   created_at?: string;
   updated_at?: string;
 }
@@ -64,7 +69,11 @@ export interface SpecialtyListItem {
   id: number;
   code: string;
   name: string;
-  is_popular: boolean;
+  short_description: string;
+  description?: string[];
+  images: Image[];
+  documents?: Image[];
+  education_options: SpecialtyEducationOption[];
 }
 
 export interface SpecialtyCreate {
@@ -72,13 +81,10 @@ export interface SpecialtyCreate {
   name: string;
   short_description?: string;
   description?: string[];
-  duration?: string;
-  budget_places?: number;
-  paid_places?: number;
-  qualification?: string;
   exams?: string[];
   images?: Image[];
-  is_popular?: boolean;
+  documents?: Image[];
+  education_options?: SpecialtyEducationOption[];
 }
 
 // Interesting Fact
@@ -145,6 +151,7 @@ export interface FAQ {
   show_in_admission: boolean;
   images: Image[];
   documents: Image[];
+  document_file_ids: number[];
   created_at?: string;
   updated_at?: string;
 }
@@ -156,6 +163,7 @@ export interface FAQCreate {
   show_in_admission?: boolean;
   images?: Image[];
   documents?: Image[];
+  document_file_ids?: number[];
 }
 
 // Document
@@ -183,10 +191,27 @@ export interface TestQuestion {
   id: number;
   text: string;
   options: string[];
+  answer_scores: { answer: string; specialties: string[] }[];
   image_url?: string | null;
   documents: Image[];
   created_at?: string;
   updated_at?: string;
+}
+
+export interface TestQuestionCreate {
+  text: string;
+  options: string[];
+  answer_scores?: { answer: string; specialties: string[] }[];
+  image_url?: string | null;
+  documents?: Image[];
+}
+
+export interface TestQuestionUpdate {
+  text?: string;
+  options?: string[];
+  answer_scores?: { answer: string; specialties: string[] }[];
+  image_url?: string | null;
+  documents?: Image[];
 }
 
 // Gallery Image
@@ -198,6 +223,17 @@ export interface GalleryImage {
   category: string;
   caption?: string | null;
   date_taken?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Document File
+export interface DocumentFile {
+  id: number;
+  title: string;
+  file_url: string;
+  file_size?: number | null;
+  category: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -240,4 +276,63 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   detail: string;
   status_code?: number;
+}
+
+// Admission Campaign
+export interface SpecialtyAdmission {
+  code: string;
+  name: string;
+  education_level?: string;
+  budget_places: number;
+  paid_places: number;
+  exams: string[];
+  duration: string;
+}
+
+export interface SubmissionMethod {
+  title: string;
+  description: string;
+  link: string | null;
+}
+
+export interface ImportantDate {
+  title: string;
+  date: string;
+  description: string | null;
+}
+
+export interface FAQHighlight {
+  question: string;
+  answer: string | string[];
+}
+
+export interface Admission {
+  year: number;
+  specialties_admission: SpecialtyAdmission[];
+  submission_methods: SubmissionMethod[];
+  important_dates: ImportantDate[];
+}
+
+export interface AdmissionListItem {
+  id: number;
+  year: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdmissionListResponse {
+  items: AdmissionListItem[];
+}
+
+export interface AdmissionCreate {
+  year: number;
+  specialties_admission: SpecialtyAdmission[];
+  submission_methods: SubmissionMethod[];
+  important_dates: ImportantDate[];
+}
+
+export interface AdmissionUpdate {
+  specialties_admission?: SpecialtyAdmission[];
+  submission_methods?: SubmissionMethod[];
+  important_dates?: ImportantDate[];
 }

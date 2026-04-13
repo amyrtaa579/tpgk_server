@@ -103,7 +103,7 @@ export default function NewsFormPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>{isEdit ? 'Редактирование новости' : 'Новая новость'}</h2>
-        <Button variant="secondary" as={Link} to="/news">
+        <Button variant="secondary" as={Link as any} to="/news">
           Назад к списку
         </Button>
       </div>
@@ -242,7 +242,7 @@ export default function NewsFormPage() {
               <Button variant="success" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/news">
+              <Button variant="secondary" as={Link as any} to="/news">
                 Отмена
               </Button>
             </div>

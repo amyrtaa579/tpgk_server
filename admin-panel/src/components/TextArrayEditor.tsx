@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Form, Button, InputGroup, Badge } from 'react-bootstrap';
 
 interface TextArrayEditorProps {
-  value: string[];
+  value?: string[];
   onChange: (values: string[]) => void;
   label?: string;
   placeholder?: string;
@@ -10,7 +10,7 @@ interface TextArrayEditorProps {
 }
 
 export default function TextArrayEditor({
-  value,
+  value = [],
   onChange,
   label = 'Текстовые элементы',
   placeholder = 'Введите текст',
@@ -18,15 +18,30 @@ export default function TextArrayEditor({
 }: TextArrayEditorProps) {
   const [newItem, setNewItem] = useState('');
 
+  // Преобразуем value в массив, если это строка
+  const items = useMemo(() => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [value]);
+
   const handleAdd = () => {
     if (newItem.trim()) {
-      onChange([...value, newItem.trim()]);
+      onChange([...items, newItem.trim()]);
       setNewItem('');
     }
   };
 
   const handleRemove = (index: number) => {
-    const updated = value.filter((_, i) => i !== index);
+    const updated = items.filter((_, i) => i !== index);
     onChange(updated);
   };
 
@@ -53,10 +68,10 @@ export default function TextArrayEditor({
         </Button>
       </InputGroup>
       <div className="mt-2">
-        {value.length === 0 ? (
+        {!items || items.length === 0 ? (
           <Form.Text className="text-muted">Элементы не добавлены</Form.Text>
         ) : (
-          value.map((item, index) => (
+          items.map((item, index) => (
             <Badge
               key={index}
               bg="primary"

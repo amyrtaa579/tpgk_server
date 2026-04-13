@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Form, Button, Card, Alert } from 'react-bootstrap';
+import { Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiService } from '../services/api';
 import MinioImagePicker from '../components/MinioImagePicker';
@@ -105,7 +105,7 @@ export default function FactFormPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>{isEdit ? 'Редактирование факта' : 'Новый интересный факт'}</h2>
-        <Button variant="secondary" as={Link} to="/facts">
+        <Button variant="secondary" as={Link as any} to="/facts">
           Назад к списку
         </Button>
       </div>
@@ -195,7 +195,7 @@ export default function FactFormPage() {
               <Button variant="info" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/facts">
+              <Button variant="secondary" as={Link as any} to="/facts">
                 Отмена
               </Button>
             </div>

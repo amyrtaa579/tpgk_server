@@ -51,7 +51,7 @@ export default function NewsListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Новости</h2>
-        <Button variant="success" as={Link} to="/news/new">
+        <Button variant="success" as={Link as any} to="/news/new">
           + Новая новость
         </Button>
       </div>
@@ -87,7 +87,7 @@ export default function NewsListPage() {
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/news/${item.id}/edit`}
                       >
                         Редактировать

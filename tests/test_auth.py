@@ -23,10 +23,10 @@ class TestAuth:
             json={
                 "email": "test@example.com",
                 "username": "testuser",
-                "password": "testpass123",
+                "password": "TestPass123!",  # Пароль соответствует требованиям: 12+ символов, заглавные, строчные, цифры, спецсимволы
             }
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["email"] == "test@example.com"

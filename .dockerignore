@@ -28,7 +28,6 @@ htmlcov/
 *.cover
 .hypothesis/
 *.log
-.env
 .env.local
 .DS_Store
 *.swp
@@ -38,5 +37,3 @@ htmlcov/
 .vscode/
 *.md
 !README.md
-alembic/versions/*.py
-!alembic/versions/__init__.py

@@ -1478,6 +1478,7 @@ def create_admin_admission_router() -> APIRouter:
             {
                 "code": s.code,
                 "name": s.name,
+                "education_level": s.education_level,
                 "budget_places": s.budget_places,
                 "paid_places": s.paid_places,
                 "exams": s.exams,

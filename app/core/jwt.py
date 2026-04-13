@@ -1,11 +1,13 @@
 """JWT утилиты для аутентификации."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
+from app.core.exceptions import ValidationException
 
 settings = get_settings()
 
@@ -14,8 +16,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 
-# Контекст для хеширования паролей
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Контекст для хеширования паролей с усиленными настройками
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -26,6 +28,45 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Хеширование пароля."""
     return pwd_context.hash(password)
+
+
+def validate_password(password: str) -> None:
+    """
+    Валидация пароля.
+    
+    Требования:
+    - Минимум 12 символов
+    - Хотя бы одна заглавная буква
+    - Хотя бы одна строчная буква
+    - Хотя бы одна цифра
+    - Хотя бы один специальный символ
+    """
+    if len(password) < 12:
+        raise ValidationException("Пароль должен быть не менее 12 символов")
+    
+    if not re.search(r"[A-Z]", password):
+        raise ValidationException("Пароль должен содержать хотя бы одну заглавную букву")
+    
+    if not re.search(r"[a-z]", password):
+        raise ValidationException("Пароль должен содержать хотя бы одну строчную букву")
+    
+    if not re.search(r"\d", password):
+        raise ValidationException("Пароль должен содержать хотя бы одну цифру")
+    
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise ValidationException("Пароль должен содержать хотя бы один специальный символ (!@#$%^&*(),.?\":{}|<>)")
+
+
+def validate_email(email: str) -> None:
+    """
+    Валидация email.
+    
+    Требования:
+    - Стандартный формат email
+    """
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    if not re.match(email_pattern, email):
+        raise ValidationException("Неверный формат email")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, scopes: Optional[list[str]] = None) -> str:

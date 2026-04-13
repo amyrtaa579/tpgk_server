@@ -17,9 +17,32 @@ import type {
   DocumentCreate,
   TestQuestion,
   Image,
+  Admission,
+  AdmissionCreate,
+  AdmissionUpdate,
+  AdmissionListResponse,
 } from '../types';
 
 const API_BASE_URL = '/api/v1';
+
+/**
+ * Исправляет HTTP URL на HTTPS для MinIO изображений
+ */
+export function fixMinioUrl(url: string): string {
+  if (!url) return url;
+  return url.replace('http://minio.anmicius.ru', 'https://minio.anmicius.ru');
+}
+
+/**
+ * Исправляет все MinIO URL в объекте (для изображений)
+ */
+export function fixMinioUrls<T extends { url?: string | null }>(items: T[]): T[] {
+  return items.map(item => ({
+    ...item,
+    url: item.url ? fixMinioUrl(item.url) : item.url,
+    thumbnail: item.thumbnail ? fixMinioUrl(item.thumbnail) : item.thumbnail,
+  }));
+}
 
 export class ApiError extends Error {
   status_code?: number;
@@ -182,16 +205,34 @@ class ApiService {
     return response.data;
   }
 
-  async createSpecialty(formData: FormData): Promise<{ id: number; code: string; name: string }> {
+  async createSpecialty(formData: {
+    code: string;
+    name: string;
+    short_description?: string;
+    description?: string;
+    exams?: string;
+    images?: string;
+    documents?: string;
+    education_options?: string;
+  }): Promise<{ id: number; code: string; name: string }> {
     const response = await this.client.post('/admin/specialties', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response.data;
   }
 
-  async updateSpecialty(id: number, formData: FormData): Promise<{ id: number; code: string; name: string }> {
+  async updateSpecialty(id: number, formData: {
+    code?: string;
+    name?: string;
+    short_description?: string;
+    description?: string;
+    exams?: string;
+    images?: string;
+    documents?: string;
+    education_options?: string;
+  }): Promise<{ id: number; code: string; name: string }> {
     const response = await this.client.put(`/admin/specialties/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response.data;
   }
@@ -325,6 +366,32 @@ class ApiService {
     return response.items;
   }
 
+  // ============ Document Files ============
+  async getDocumentFiles(category?: string): Promise<{ total: number; items: DocumentFile[] }> {
+    const params = category ? { category } : {};
+    const response = await this.client.get('/admin/document-files', { params });
+    return response.data;
+  }
+
+  async getDocumentFile(id: number): Promise<DocumentFile> {
+    const response = await this.client.get(`/admin/document-files/${id}`);
+    return response.data;
+  }
+
+  async createDocumentFile(fileData: { title: string; file_url: string; file_size?: number | null; category: string }): Promise<DocumentFile> {
+    const response = await this.client.post('/admin/document-files', fileData);
+    return response.data;
+  }
+
+  async updateDocumentFile(id: number, fileData: Partial<DocumentFile>): Promise<DocumentFile> {
+    const response = await this.client.put(`/admin/document-files/${id}`, fileData);
+    return response.data;
+  }
+
+  async deleteDocumentFile(id: number): Promise<void> {
+    await this.client.delete(`/admin/document-files/${id}`);
+  }
+
   // ============ FAQ ============
   async getFaq(): Promise<FAQ[]> {
     const response = await this.client.get<FAQ[]>('/admin/faq');
@@ -396,18 +463,55 @@ class ApiService {
     return response.data;
   }
 
-  async createTestQuestion(questionData: { text: string; options: string[]; image_url?: string }): Promise<TestQuestion> {
+  async createTestQuestion(questionData: { 
+    text: string; 
+    options: string[]; 
+    answer_scores?: { answer: string; specialties: string[] }[];
+    image_url?: string;
+    documents?: string[];
+  }): Promise<TestQuestion> {
     const response = await this.client.post<TestQuestion>('/admin/test/questions', questionData);
     return response.data;
   }
 
-  async updateTestQuestion(id: number, questionData: Partial<TestQuestion>): Promise<TestQuestion> {
+  async updateTestQuestion(id: number, questionData: { 
+    text?: string; 
+    options?: string[];
+    answer_scores?: { answer: string; specialties: string[] }[];
+    image_url?: string;
+    documents?: string[];
+  }): Promise<TestQuestion> {
     const response = await this.client.put<TestQuestion>(`/admin/test/questions/${id}`, questionData);
     return response.data;
   }
 
   async deleteTestQuestion(id: number): Promise<void> {
     await this.client.delete(`/admin/test/questions/${id}`);
+  }
+
+  // ============ Admission ============
+  async getAdmissionList(): Promise<AdmissionListResponse> {
+    const response = await this.client.get<AdmissionListResponse>('/admin/admission');
+    return response.data;
+  }
+
+  async getAdmissionByYear(year: number): Promise<Admission> {
+    const response = await this.client.get<Admission>(`/admin/admission/${year}`);
+    return response.data;
+  }
+
+  async createAdmission(admissionData: AdmissionCreate): Promise<Admission> {
+    const response = await this.client.post<Admission>('/admin/admission', admissionData);
+    return response.data;
+  }
+
+  async updateAdmission(year: number, admissionData: AdmissionUpdate): Promise<Admission> {
+    const response = await this.client.put<Admission>(`/admin/admission/${year}`, admissionData);
+    return response.data;
+  }
+
+  async deleteAdmission(year: number): Promise<void> {
+    await this.client.delete(`/admin/admission/${year}`);
   }
 }
 

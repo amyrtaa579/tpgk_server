@@ -10,6 +10,8 @@ from app.core.jwt import (
     create_access_token,
     create_refresh_token,
     verify_token,
+    validate_password,
+    validate_email,
 )
 from app.core.exceptions import (
     AppException,
@@ -26,6 +28,9 @@ class RegisterUserUseCase:
         self.repository = repository
 
     async def execute(self, email: str, username: str, password: str) -> User:
+        # Валидация email
+        validate_email(email)
+        
         # Проверка существующего email
         existing_user = await self.repository.get_by_email(email)
         if existing_user:
@@ -37,8 +42,7 @@ class RegisterUserUseCase:
             raise BadRequestException("Пользователь с таким username уже существует")
 
         # Валидация пароля
-        if len(password) < 6:
-            raise ValidationException("Пароль должен быть не менее 6 символов")
+        validate_password(password)
 
         # Создание пользователя
         user = await self.repository.create(email, username, password)
@@ -247,12 +251,10 @@ class UpdateUserUseCase:
 
         # Обновление пароля
         if "password" in updates and updates["password"]:
-            if len(updates["password"]) < 6:
-                raise ValidationException("Пароль должен быть не менее 6 символов")
-            from app.core.jwt import get_password_hash
-            # Пароль будет захеширован в репозитории
-            # Для этого нужно передать пароль отдельно
-            pass  # Обработка пароля будет в repository.update
+            validate_password(updates["password"])
+            # Используем update_with_password для инвалидации токенов
+            updated_user = await self.repository.update_with_password(user, updates["password"])
+            return updated_user
 
         updated_user = await self.repository.update(user)
         return updated_user

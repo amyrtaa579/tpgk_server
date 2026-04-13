@@ -51,7 +51,7 @@ export default function DocumentsListPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Документы</h2>
-        <Button variant="success" as={Link} to="/documents/new">
+        <Button variant="success" as={Link as any} to="/documents/new">
           + Новый документ
         </Button>
       </div>
@@ -89,7 +89,7 @@ export default function DocumentsListPage() {
                         variant="outline-primary"
                         size="sm"
                         className="me-2"
-                        as={Link}
+                        as={Link as any}
                         to={`/documents/${doc.id}/edit`}
                       >
                         Редактировать

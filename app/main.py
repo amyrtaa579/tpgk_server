@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from slowapi.errors import RateLimitExceeded
 from structlog import get_logger
 
 from app.core.config import get_settings
 from app.core.exceptions import AppException, NotFoundException, BadRequestException, ValidationException
-from app.infrastructure.database import init_db, close_db
+from app.infrastructure.database import init_db, close_db, async_session_maker
+from app.infrastructure.cache import init_cache, close_cache
 from app.presentation.routes import create_v1_router
 from app.presentation.admin_routes import (
     create_auth_router,
@@ -20,10 +22,14 @@ from app.presentation.admin_routes import (
     create_admin_facts_router,
     create_admin_upload_router,
     create_admin_gallery_router,
+    create_admin_document_files_router,
     create_admin_faq_router,
     create_admin_documents_router,
     create_admin_about_router,
     create_admin_test_router,
+    create_admin_cache_router,
+    create_admin_admission_router,
+    get_rate_limit_exception_handler,
 )
 
 logger = get_logger()
@@ -40,11 +46,14 @@ async def lifespan(app: FastAPI):
     logger.info("Запуск приложения", name=settings.app_name, version=settings.app_version)
     await init_db()
     logger.info("База данных инициализирована")
-    
+    await init_cache()
+    logger.info("Кэш инициализирован")
+
     yield
-    
+
     # Shutdown
     await close_db()
+    await close_cache()
     logger.info("Приложение остановлено")
 
 
@@ -82,9 +91,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.get_cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,  # Отключено для безопасности с конкретными origins
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
     
     # Регистрация роутеров
@@ -96,10 +105,16 @@ def create_app() -> FastAPI:
     app.include_router(create_admin_facts_router())  # Админ: факты
     app.include_router(create_admin_upload_router())  # Админ: загрузка файлов
     app.include_router(create_admin_gallery_router())  # Админ: галерея
+    app.include_router(create_admin_document_files_router())  # Админ: файлы документов
     app.include_router(create_admin_faq_router())  # Админ: FAQ
     app.include_router(create_admin_documents_router())  # Админ: документы
     app.include_router(create_admin_about_router())  # Админ: о колледже
     app.include_router(create_admin_test_router())  # Админ: тесты
+    app.include_router(create_admin_cache_router())  # Админ: кэш
+    app.include_router(create_admin_admission_router())  # Админ: приёмная кампания
+
+    # Обработчик исключений rate limiting
+    app.add_exception_handler(RateLimitExceeded, get_rate_limit_exception_handler())
     
     # Обработчики исключений
     @app.exception_handler(AppException)
@@ -130,7 +145,48 @@ def create_app() -> FastAPI:
     # Health check
     @app.get("/health", tags=["Health"])
     async def health_check():
-        return {"status": "ok", "version": settings.app_version}
+        """Проверка здоровья приложения и зависимостей."""
+        from app.infrastructure.cache import cache_service
+        from app.infrastructure.minio_service import get_minio_client
+        from app.infrastructure.database import get_db_session
+        from sqlalchemy import select, text
+        
+        health_status = {
+            "status": "ok",
+            "version": settings.app_version,
+            "services": {}
+        }
+        all_ok = True
+        
+        # Проверка БД (критично)
+        try:
+            async with async_session_maker() as session:
+                await session.execute(text("SELECT 1"))
+            health_status["services"]["database"] = {"status": "ok"}
+        except Exception as e:
+            health_status["services"]["database"] = {"status": "error", "message": str(e)}
+            health_status["status"] = "degraded"
+            all_ok = False
+        
+        # Проверка Redis (некритично, кэш опционален)
+        try:
+            redis_available = await cache_service.is_available()
+            if redis_available:
+                health_status["services"]["redis"] = {"status": "ok"}
+            else:
+                health_status["services"]["redis"] = {"status": "unavailable", "message": "Redis not configured"}
+        except Exception as e:
+            health_status["services"]["redis"] = {"status": "error", "message": str(e)}
+        
+        # Проверка MinIO (некритично для health check)
+        try:
+            minio_client = get_minio_client()
+            minio_client.bucket_exists(settings.minio_bucket)
+            health_status["services"]["minio"] = {"status": "ok"}
+        except Exception as e:
+            health_status["services"]["minio"] = {"status": "unavailable", "message": "MinIO not configured"}
+        
+        return health_status
     
     @app.get("/", tags=["Root"])
     async def root():

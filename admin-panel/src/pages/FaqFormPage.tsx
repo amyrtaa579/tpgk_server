@@ -3,7 +3,7 @@ import { Form, Button, Card, Alert, Spinner, Row, Col } from 'react-bootstrap';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
 import MinioImagePicker from '../components/MinioImagePicker';
-import DocumentUploader from '../components/DocumentUploader';
+import MinioDocumentPicker from '../components/MinioDocumentPicker';
 import TextArrayEditor from '../components/TextArrayEditor';
 import type { Image, FAQ } from '../types';
 
@@ -19,13 +19,14 @@ export default function FaqFormPage() {
     show_in_admission: false,
     images: [] as Image[],
     documents: [] as Image[],
+    document_file_ids: [] as number[],
   });
 
   const [isLoading, setIsLoading] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [showDocumentUploader, setShowDocumentUploader] = useState(false);
+  const [showDocumentPicker, setShowDocumentPicker] = useState(false);
 
   useEffect(() => {
     if (isEdit) {
@@ -43,6 +44,7 @@ export default function FaqFormPage() {
         show_in_admission: faq.show_in_admission,
         images: faq.images || [],
         documents: faq.documents || [],
+        document_file_ids: faq.document_file_ids || [],
       });
     } catch (err) {
       setError('Не удалось загрузить вопрос: ' + (err instanceof Error ? err.message : 'Неизвестная ошибка'));
@@ -85,13 +87,26 @@ export default function FaqFormPage() {
     setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
   };
 
-  const handleDocumentSelect = (documentUrl: string, title: string) => {
-    const newDoc: Image = { url: documentUrl, alt: title };
-    setFormData({ ...formData, documents: [...formData.documents, newDoc] });
+  const handleDocumentSelect = (documentUrl: string, title: string, docId?: number) => {
+    if (docId) {
+      // Документ из галереи — добавляем ID
+      if (!formData.document_file_ids.includes(docId)) {
+        setFormData({ ...formData, document_file_ids: [...formData.document_file_ids, docId] });
+      }
+    } else {
+      // Прямая загрузка — добавляем как документ
+      const newDoc: Image = { url: documentUrl, alt: title };
+      setFormData({ ...formData, documents: [...formData.documents, newDoc] });
+    }
+    setShowDocumentPicker(false);
   };
 
-  const handleRemoveDocument = (index: number) => {
-    setFormData({ ...formData, documents: formData.documents.filter((_, i) => i !== index) });
+  const handleRemoveDocument = (index: number, type: 'document' | 'file') => {
+    if (type === 'document') {
+      setFormData({ ...formData, documents: formData.documents.filter((_, i) => i !== index) });
+    } else {
+      setFormData({ ...formData, document_file_ids: formData.document_file_ids.filter((_, i) => i !== index) });
+    }
   };
 
   if (isLoading) {
@@ -106,7 +121,7 @@ export default function FaqFormPage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>{isEdit ? 'Редактирование вопроса' : 'Новый вопрос'}</h2>
-        <Button variant="secondary" as={Link} to="/faq">
+        <Button variant="secondary" as={Link as any} to="/faq">
           Назад к списку
         </Button>
       </div>
@@ -205,41 +220,81 @@ export default function FaqFormPage() {
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  onClick={() => setShowDocumentUploader(true)}
+                  onClick={() => setShowDocumentPicker(true)}
                 >
                   Добавить документ
                 </Button>
+                <Form.Text className="text-muted d-block mt-1">
+                  Можно загрузить файл или выбрать из галереи документов
+                </Form.Text>
               </div>
-              <div className="mt-2">
-                {formData.documents.map((doc: Image, index: number) => (
-                  <div key={index} className="d-inline-block me-2 position-relative">
-                    <div
-                      className="d-flex align-items-center justify-content-center bg-light border rounded"
-                      style={{ width: '100px', height: '100px', borderRadius: '4px' }}
-                    >
-                      <span style={{ fontSize: '24px' }}>📄</span>
-                    </div>
-                    <div className="text-center" style={{ fontSize: '12px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {doc.alt}
-                    </div>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      className="position-absolute top-0 start-100 translate-middle rounded-circle p-1"
-                      onClick={() => handleRemoveDocument(index)}
-                    >
-                      ×
-                    </Button>
+
+              {/* Загруженные документы (прямая загрузка) */}
+              {formData.documents.length > 0 && (
+                <div className="mb-3">
+                  <Form.Label className="text-muted small">Загруженные файлы:</Form.Label>
+                  <div>
+                    {formData.documents.map((doc: Image, index: number) => (
+                      <div key={`doc-${index}`} className="d-inline-block me-2 position-relative mb-2">
+                        <div
+                          className="d-flex align-items-center justify-content-center bg-light border rounded"
+                          style={{ width: '100px', height: '100px', borderRadius: '4px' }}
+                        >
+                          <span style={{ fontSize: '24px' }}>📄</span>
+                        </div>
+                        <div className="text-center" style={{ fontSize: '12px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {doc.alt}
+                        </div>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="position-absolute top-0 start-100 translate-middle rounded-circle p-1"
+                          onClick={() => handleRemoveDocument(index, 'document')}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
+              {/* Документы из галереи */}
+              {formData.document_file_ids.length > 0 && (
+                <div>
+                  <Form.Label className="text-muted small">Из галереи документов:</Form.Label>
+                  <div>
+                    {formData.document_file_ids.map((fileId: number, index: number) => (
+                      <div key={`file-${index}`} className="d-inline-block me-2 position-relative mb-2">
+                        <div
+                          className="d-flex align-items-center justify-content-center bg-info bg-opacity-10 border border-info border-opacity-25 rounded"
+                          style={{ width: '100px', height: '100px', borderRadius: '4px' }}
+                        >
+                          <span style={{ fontSize: '24px' }}>📎</span>
+                        </div>
+                        <div className="text-center" style={{ fontSize: '12px', maxWidth: '100px' }}>
+                          ID: {fileId}
+                        </div>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="position-absolute top-0 start-100 translate-middle rounded-circle p-1"
+                          onClick={() => handleRemoveDocument(index, 'file')}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Form.Group>
 
             <div className="d-flex gap-2">
               <Button variant="success" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/faq">
+              <Button variant="secondary" as={Link as any} to="/faq">
                 Отмена
               </Button>
             </div>
@@ -254,9 +309,9 @@ export default function FaqFormPage() {
         hideMinioTab={true}
       />
 
-      <DocumentUploader
-        show={showDocumentUploader}
-        onHide={() => setShowDocumentUploader(false)}
+      <MinioDocumentPicker
+        show={showDocumentPicker}
+        onHide={() => setShowDocumentPicker(false)}
         onSelect={handleDocumentSelect}
       />
     </div>

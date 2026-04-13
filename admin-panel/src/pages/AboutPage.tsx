@@ -144,7 +144,7 @@ export default function AboutPage() {
               <Button variant="success" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Сохранение...' : 'Сохранить'}
               </Button>
-              <Button variant="secondary" as={Link} to="/">
+              <Button variant="secondary" as={Link as any} to="/">
                 Отмена
               </Button>
             </div>

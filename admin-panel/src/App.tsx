@@ -22,6 +22,8 @@ import DocumentsFormPage from './pages/DocumentsFormPage';
 import AboutPage from './pages/AboutPage';
 import TestQuestionsListPage from './pages/TestQuestionsListPage';
 import TestQuestionFormPage from './pages/TestQuestionFormPage';
+import AdmissionListPage from './pages/AdmissionListPage';
+import AdmissionFormPage from './pages/AdmissionFormPage';
 
 export default function App() {
   return (
@@ -286,6 +288,38 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <TestQuestionFormPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admission */}
+          <Route
+            path="/admission"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AdmissionListPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admission/new"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AdmissionFormPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admission/:year/edit"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AdmissionFormPage />
                 </Layout>
               </ProtectedRoute>
             }

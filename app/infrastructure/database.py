@@ -37,9 +37,12 @@ async def get_db_session() -> AsyncSession:
 
 
 async def init_db():
-    """Инициализация БД - создание таблиц."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Инициализация БД - проверка подключения."""
+    # Таблицы создаются через миграции Alembic, а не автоматически
+    # При необходимости можно раскомментировать для разработки:
+    # async with engine.begin() as conn:
+    #     await conn.run_sync(Base.metadata.create_all)
+    pass
 
 
 async def close_db():
